@@ -1,0 +1,67 @@
+# https://taskfile.dev
+version: '3'
+
+vars:
+  BINARY_NAME: jira-go
+  BUILD_DIR: ./build
+
+tasks:
+  default:
+    cmds:
+      - task: build
+
+  build:
+    desc: Build the binary
+    cmds:
+      - mkdir -p {{.BUILD_DIR}}
+      - go build -o {{.BUILD_DIR}}/{{.BINARY_NAME}} ./cmd/jira-go
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+    generates:
+      - "{{.BUILD_DIR}}/{{.BINARY_NAME}}"
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test -v ./...
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf {{.BUILD_DIR}}
+
+  install:
+    desc: Install binary to GOPATH/bin
+    deps: [build]
+    cmds:
+      - cp {{.BUILD_DIR}}/{{.BINARY_NAME}} $(go env GOPATH)/bin/
+
+  lint:
+    desc: Run linter
+    cmds:
+      - golangci-lint run
+
+  dev:
+    desc: Run in development mode
+    cmds:
+      - go run ./cmd/jira-go
+
+  deps:
+    desc: Download and tidy dependencies
+    cmds:
+      - go mod tidy
+      - go mod download
+
+  fmt:
+    desc: Format Go code
+    cmds:
+      - go fmt ./...
+
+  check:
+    desc: Run all checks (fmt, lint, test)
+    cmds:
+      - task: fmt
+      - task: lint
+      - task: test
