@@ -50,6 +50,6 @@ func runTUIList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Launch TUI
-	model := tui.NewIssueList(resp.Issues)
+	model := tui.NewIssueList(resp.Issues, client, projectKey)
 	return tui.Run(model)
 }

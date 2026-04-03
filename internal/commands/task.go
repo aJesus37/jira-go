@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/user/jira-go/internal/api"
 	"github.com/user/jira-go/internal/config"
+	"github.com/user/jira-go/internal/models"
+	"github.com/user/jira-go/internal/tui"
 )
 
 var taskCmd = &cobra.Command{
@@ -18,8 +20,10 @@ var taskCmd = &cobra.Command{
 
 var taskListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List tasks",
-	RunE:  runTaskList,
+	Short: "List tasks (interactive by default)",
+	Long: `List tasks in interactive TUI mode by default.
+Use --no-interactive flag for plain text output suitable for automation.`,
+	RunE: runTaskList,
 }
 
 var taskCreateCmd = &cobra.Command{
@@ -61,7 +65,7 @@ func init() {
 	taskListCmd.Flags().String("project", "", "Project key (defaults to config)")
 	taskListCmd.Flags().String("assignee", "", "Filter by assignee")
 	taskListCmd.Flags().String("status", "", "Filter by status")
-	taskListCmd.Flags().Int("limit", 25, "Maximum results")
+	taskListCmd.Flags().Int("limit", 50, "Maximum results (default 50 for interactive mode)")
 
 	// Create flags
 	taskCreateCmd.Flags().String("project", "", "Project key (defaults to config)")
@@ -120,11 +124,21 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("searching issues: %w", err)
 	}
 
-	// Simple table output (will be replaced with TUI later)
+	// Check if we should run in non-interactive mode
+	if noInteractiveFlag {
+		return displayTaskListTable(resp.Issues, resp.Total)
+	}
+
+	// Run in interactive TUI mode
+	model := tui.NewIssueList(resp.Issues, client, projectKey)
+	return tui.Run(model)
+}
+
+func displayTaskListTable(issues []models.Issue, total int) error {
 	fmt.Printf("%-12s %-10s %-12s %s\n", "KEY", "TYPE", "STATUS", "SUMMARY")
 	fmt.Println(strings.Repeat("-", 80))
 
-	for _, issue := range resp.Issues {
+	for _, issue := range issues {
 		status := issue.Status
 		if len(status) > 12 {
 			status = status[:9] + "..."
@@ -138,8 +152,7 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 		fmt.Printf("%-12s %-10s %-12s %s\n", issue.Key, issue.Type, status, summary)
 	}
 
-	fmt.Printf("\nShowing %d of %d issues\n", len(resp.Issues), resp.Total)
-
+	fmt.Printf("\nShowing %d of %d issues\n", len(issues), total)
 	return nil
 }
 
