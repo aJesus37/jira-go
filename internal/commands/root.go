@@ -2,7 +2,11 @@
 package commands
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/spf13/cobra"
+	"github.com/user/jira-go/internal/config"
 )
 
 var (
@@ -20,10 +24,9 @@ var rootCmd = &cobra.Command{
 	Long: `jira-go is a comprehensive CLI for Jira Software that supports
 task management, sprint operations, epics, and agile ceremonies.
 
-Use "jira-go init" to get started with the initial configuration.
-
-By default, commands like "task list" run in interactive TUI mode.
+By default, commands run in interactive TUI mode.
 Use --no-interactive flag for automation/AI agent compatibility.`,
+	RunE: runDefault,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Skip for init command
 		if cmd.Name() == "init" || cmd.Name() == "version" || cmd.Name() == "help" {
@@ -33,6 +36,23 @@ Use --no-interactive flag for automation/AI agent compatibility.`,
 		// TODO: Initialize cache based on flags
 		return nil
 	},
+}
+
+// runDefault determines what to do when jira-go is run without subcommands
+func runDefault(cmd *cobra.Command, args []string) error {
+	// Check if config exists
+	configPath := config.GetConfigPath()
+	_, err := os.Stat(configPath)
+
+	if os.IsNotExist(err) {
+		// No config found, run init
+		fmt.Println("No configuration found. Let's set up jira-go!")
+		fmt.Println()
+		return runInit(cmd, args)
+	}
+
+	// Config exists, run task list
+	return runTaskList(cmd, args)
 }
 
 // Execute runs the root command

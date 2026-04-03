@@ -141,6 +141,9 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 	}
 
 	limit, _ := cmd.Flags().GetInt("limit")
+	if limit <= 0 {
+		limit = 50 // Default limit
+	}
 
 	resp, err := client.SearchIssues(jql, 0, limit, ownerFieldID)
 	if err != nil {
