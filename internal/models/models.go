@@ -19,6 +19,67 @@ type Issue struct {
 	Labels      []string  `json:"labels"`
 }
 
+// IssueFields represents the fields of a Jira issue (for API parsing)
+type IssueFields struct {
+	Summary     string      `json:"summary"`
+	Description interface{} `json:"description"` // Can be string or ADF (Atlassian Document Format)
+	IssueType   IssueType   `json:"issuetype"`
+	Status      Status      `json:"status"`
+	Assignee    *User       `json:"assignee"`
+	Reporter    *User       `json:"reporter"`
+	Created     time.Time   `json:"created"`
+	Updated     time.Time   `json:"updated"`
+	Labels      []string    `json:"labels"`
+}
+
+// IssueType represents an issue type
+type IssueType struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// Status represents an issue status
+type Status struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// RawIssue represents the raw Jira API response
+type RawIssue struct {
+	Key    string      `json:"key"`
+	ID     string      `json:"id"`
+	Fields IssueFields `json:"fields"`
+}
+
+// ToIssue converts a RawIssue to an Issue
+func (r *RawIssue) ToIssue() Issue {
+	issue := Issue{
+		Key:      r.Key,
+		ID:       r.ID,
+		Summary:  r.Fields.Summary,
+		Type:     r.Fields.IssueType.Name,
+		Status:   r.Fields.Status.Name,
+		Assignee: r.Fields.Assignee,
+		Reporter: r.Fields.Reporter,
+		Created:  r.Fields.Created,
+		Updated:  r.Fields.Updated,
+		Labels:   r.Fields.Labels,
+	}
+
+	// Extract description (handle both string and ADF)
+	switch d := r.Fields.Description.(type) {
+	case string:
+		issue.Description = d
+	default:
+		// For ADF format, we'd need more complex parsing
+		// For now, just store as empty or implement ADF to markdown conversion
+		issue.Description = ""
+	}
+
+	return issue
+}
+
 // User represents a Jira user
 type User struct {
 	AccountID   string `json:"accountId"`

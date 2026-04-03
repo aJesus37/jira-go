@@ -79,6 +79,10 @@ func init() {
 }
 
 func getProjectKey(cmd *cobra.Command, cfg *config.Config) string {
+	// Check global flag first
+	if projectFlag != "" {
+		return projectFlag
+	}
 	if project, _ := cmd.Flags().GetString("project"); project != "" {
 		return project
 	}

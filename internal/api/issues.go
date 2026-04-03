@@ -19,10 +19,18 @@ type IssueSearchRequest struct {
 
 // IssueSearchResponse represents search results
 type IssueSearchResponse struct {
-	Total      int            `json:"total"`
-	StartAt    int            `json:"startAt"`
-	MaxResults int            `json:"maxResults"`
-	Issues     []models.Issue `json:"issues"`
+	Total      int               `json:"total"`
+	StartAt    int               `json:"startAt"`
+	MaxResults int               `json:"maxResults"`
+	Issues     []models.Issue    `json:"-"` // Populated manually from RawIssues
+	RawIssues  []models.RawIssue `json:"issues"`
+}
+
+// CreateIssueResponse represents the response from creating an issue
+type CreateIssueResponse struct {
+	ID   string `json:"id"`
+	Key  string `json:"key"`
+	Self string `json:"self"`
 }
 
 // CreateIssue creates a new issue
@@ -50,12 +58,13 @@ func (c *Client) CreateIssue(projectKey, summary, description, issueType string)
 		return nil, fmt.Errorf("create issue failed: %s", resp.Status)
 	}
 
-	var result models.Issue
+	var result CreateIssueResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
-	return &result, nil
+	// Fetch the full issue to return complete data
+	return c.GetIssue(result.Key)
 }
 
 // GetIssue retrieves an issue by key
@@ -74,11 +83,12 @@ func (c *Client) GetIssue(key string) (*models.Issue, error) {
 		return nil, fmt.Errorf("get issue failed: %s", resp.Status)
 	}
 
-	var issue models.Issue
-	if err := json.NewDecoder(resp.Body).Decode(&issue); err != nil {
+	var rawIssue models.RawIssue
+	if err := json.NewDecoder(resp.Body).Decode(&rawIssue); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
+	issue := rawIssue.ToIssue()
 	return &issue, nil
 }
 
@@ -104,6 +114,12 @@ func (c *Client) SearchIssues(jql string, startAt, maxResults int) (*IssueSearch
 	var result IssueSearchResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	// Convert RawIssues to Issues
+	for _, raw := range result.RawIssues {
+		issue := raw.ToIssue()
+		result.Issues = append(result.Issues, issue)
 	}
 
 	return &result, nil
