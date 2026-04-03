@@ -1,12 +1,21 @@
 // internal/tui/tui.go
 package tui
 
-// TUI handles terminal user interface
-type TUI struct {
-	// TODO: Implement Bubble Tea TUI
+import (
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+// Model is the base interface for all TUI models
+type Model interface {
+	tea.Model
+	GetTitle() string
 }
 
-// New creates a new TUI instance
-func New() *TUI {
-	return &TUI{}
+// Run starts a TUI program
+func Run(model tea.Model) error {
+	p := tea.NewProgram(model, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		return err
+	}
+	return nil
 }
