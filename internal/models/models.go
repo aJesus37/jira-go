@@ -3,6 +3,7 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -87,39 +88,152 @@ type Status struct {
 	Name string `json:"name"`
 }
 
-// RawIssue represents the raw Jira API response
+// RawIssue represents the raw Jira API response with custom fields
 type RawIssue struct {
-	Key    string      `json:"key"`
-	ID     string      `json:"id"`
-	Fields IssueFields `json:"fields"`
+	Key    string                 `json:"key"`
+	ID     string                 `json:"id"`
+	Fields map[string]interface{} `json:"fields"`
 }
 
 // ToIssue converts a RawIssue to an Issue
 func (r *RawIssue) ToIssue() Issue {
 	issue := Issue{
-		Key:      r.Key,
-		ID:       r.ID,
-		Summary:  r.Fields.Summary,
-		Type:     r.Fields.IssueType.Name,
-		Status:   r.Fields.Status.Name,
-		Assignee: r.Fields.Assignee,
-		Reporter: r.Fields.Reporter,
-		Created:  r.Fields.Created.Time(),
-		Updated:  r.Fields.Updated.Time(),
-		Labels:   r.Fields.Labels,
+		Key: r.Key,
+		ID:  r.ID,
 	}
 
-	// Extract description (handle both string and ADF)
-	switch d := r.Fields.Description.(type) {
-	case string:
-		issue.Description = d
-	default:
-		// For ADF format, we'd need more complex parsing
-		// For now, just store as empty or implement ADF to markdown conversion
-		issue.Description = ""
+	// Extract standard fields
+	if summary, ok := r.Fields["summary"].(string); ok {
+		issue.Summary = summary
+	}
+
+	if desc, ok := r.Fields["description"]; ok {
+		switch d := desc.(type) {
+		case string:
+			issue.Description = d
+		default:
+			issue.Description = ""
+		}
+	}
+
+	if issuetype, ok := r.Fields["issuetype"].(map[string]interface{}); ok {
+		if name, ok := issuetype["name"].(string); ok {
+			issue.Type = name
+		}
+	}
+
+	if status, ok := r.Fields["status"].(map[string]interface{}); ok {
+		if name, ok := status["name"].(string); ok {
+			issue.Status = name
+		}
+	}
+
+	// Parse times
+	if created, ok := r.Fields["created"].(string); ok && created != "" {
+		if t, err := parseJiraTime(created); err == nil {
+			issue.Created = t
+		}
+	}
+
+	if updated, ok := r.Fields["updated"].(string); ok && updated != "" {
+		if t, err := parseJiraTime(updated); err == nil {
+			issue.Updated = t
+		}
+	}
+
+	// Parse labels
+	if labels, ok := r.Fields["labels"].([]interface{}); ok {
+		for _, l := range labels {
+			if label, ok := l.(string); ok {
+				issue.Labels = append(issue.Labels, label)
+			}
+		}
+	}
+
+	// Parse assignee
+	if assignee, ok := r.Fields["assignee"].(map[string]interface{}); ok && assignee != nil {
+		issue.Assignee = parseUser(assignee)
+	}
+
+	// Parse reporter
+	if reporter, ok := r.Fields["reporter"].(map[string]interface{}); ok && reporter != nil {
+		issue.Reporter = parseUser(reporter)
 	}
 
 	return issue
+}
+
+// ToIssueWithOwners converts a RawIssue to an Issue with owners from custom field
+func (r *RawIssue) ToIssueWithOwners(ownerFieldID string) Issue {
+	issue := r.ToIssue()
+
+	// Parse owners from custom field
+	if ownerFieldID != "" {
+		if owners, ok := r.Fields[ownerFieldID].([]interface{}); ok {
+			for _, o := range owners {
+				if ownerMap, ok := o.(map[string]interface{}); ok {
+					if user := parseUser(ownerMap); user != nil {
+						issue.Owners = append(issue.Owners, *user)
+					}
+				}
+			}
+		}
+	}
+
+	return issue
+}
+
+// parseUser extracts user data from a map
+func parseUser(data map[string]interface{}) *User {
+	if data == nil {
+		return nil
+	}
+
+	user := &User{}
+
+	if accountID, ok := data["accountId"].(string); ok {
+		user.AccountID = accountID
+	}
+
+	if displayName, ok := data["displayName"].(string); ok {
+		user.DisplayName = displayName
+	}
+
+	if email, ok := data["emailAddress"].(string); ok {
+		user.Email = email
+	}
+
+	// Parse avatar URLs if present
+	if avatars, ok := data["avatarUrls"].(map[string]interface{}); ok {
+		user.AvatarURLs = make(map[string]string)
+		for k, v := range avatars {
+			if url, ok := v.(string); ok {
+				user.AvatarURLs[k] = url
+			}
+		}
+	}
+
+	return user
+}
+
+// parseJiraTime tries to parse Jira timestamp
+func parseJiraTime(s string) (time.Time, error) {
+	formats := []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05.000-0700",
+		"2006-01-02T15:04:05.000Z",
+		"2006-01-02T15:04:05-0700",
+		"2006-01-02T15:04:05.000Z0700",
+		"2006-01-02T15:04:05Z0700",
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, s); err == nil {
+			return t, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("unable to parse time: %s", s)
 }
 
 // User represents a Jira user

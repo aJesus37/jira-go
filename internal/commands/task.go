@@ -22,7 +22,11 @@ var taskListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List tasks (interactive by default)",
 	Long: `List tasks in interactive TUI mode by default.
-Use --no-interactive flag for plain text output suitable for automation.`,
+Use --no-interactive flag for plain text output suitable for automation.
+
+Filter by assignee or owner email:
+  jira-go task list --assignee "user@example.com"
+  jira-go task list --owner "user@example.com"`,
 	RunE: runTaskList,
 }
 
@@ -63,7 +67,8 @@ func init() {
 
 	// List flags
 	taskListCmd.Flags().String("project", "", "Project key (defaults to config)")
-	taskListCmd.Flags().String("assignee", "", "Filter by assignee")
+	taskListCmd.Flags().String("assignee", "", "Filter by assignee email")
+	taskListCmd.Flags().String("owner", "", "Filter by owner email (multi-owner field)")
 	taskListCmd.Flags().String("status", "", "Filter by status")
 	taskListCmd.Flags().Int("limit", 50, "Maximum results (default 50 for interactive mode)")
 
@@ -110,33 +115,70 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 	jql := fmt.Sprintf("project = %s", projectKey)
 
 	if assignee, _ := cmd.Flags().GetString("assignee"); assignee != "" {
-		jql += fmt.Sprintf(" AND assignee = '%s'", assignee)
+		// Resolve email to account ID for JQL
+		user, err := client.ResolveEmail(assignee)
+		if err != nil {
+			return fmt.Errorf("resolving assignee email: %w", err)
+		}
+		jql += fmt.Sprintf(" AND assignee = '%s'", user.AccountID)
 	}
 
 	if status, _ := cmd.Flags().GetString("status"); status != "" {
 		jql += fmt.Sprintf(" AND status = '%s'", status)
 	}
 
+	// Get project config for owner field
+	project, _ := cfg.GetProject(projectKey)
+	ownerFieldID := project.MultiOwnerField
+
+	// Handle owner filter - we'll filter locally since JQL for custom fields is unreliable
+	var ownerFilterEmail string
+	if ownerEmail, _ := cmd.Flags().GetString("owner"); ownerEmail != "" {
+		if ownerFieldID == "" {
+			return fmt.Errorf("multi_owner_field not configured, cannot filter by owner")
+		}
+		ownerFilterEmail = strings.ToLower(ownerEmail)
+	}
+
 	limit, _ := cmd.Flags().GetInt("limit")
 
-	resp, err := client.SearchIssues(jql, 0, limit)
+	resp, err := client.SearchIssues(jql, 0, limit, ownerFieldID)
 	if err != nil {
 		return fmt.Errorf("searching issues: %w", err)
 	}
 
+	// Filter by owner locally if specified
+	if ownerFilterEmail != "" {
+		var filteredIssues []models.Issue
+		for _, issue := range resp.Issues {
+			for _, owner := range issue.Owners {
+				if strings.ToLower(owner.Email) == ownerFilterEmail {
+					filteredIssues = append(filteredIssues, issue)
+					break
+				}
+			}
+		}
+		resp.Issues = filteredIssues
+	}
+
 	// Check if we should run in non-interactive mode
 	if noInteractiveFlag {
-		return displayTaskListTable(resp.Issues, resp.Total)
+		return displayTaskListTable(resp.Issues, resp.Total, project.MultiOwnerField != "")
 	}
 
 	// Run in interactive TUI mode
-	model := tui.NewIssueList(resp.Issues, client, projectKey)
+	model := tui.NewIssueList(resp.Issues, client, projectKey, ownerFieldID)
 	return tui.Run(model)
 }
 
-func displayTaskListTable(issues []models.Issue, total int) error {
-	fmt.Printf("%-12s %-10s %-12s %s\n", "KEY", "TYPE", "STATUS", "SUMMARY")
-	fmt.Println(strings.Repeat("-", 80))
+func displayTaskListTable(issues []models.Issue, total int, showOwners bool) error {
+	if showOwners {
+		fmt.Printf("%-12s %-10s %-12s %-20s %s\n", "KEY", "TYPE", "STATUS", "ASSIGNEE", "SUMMARY")
+		fmt.Println(strings.Repeat("-", 100))
+	} else {
+		fmt.Printf("%-12s %-10s %-12s %-20s %s\n", "KEY", "TYPE", "STATUS", "ASSIGNEE", "SUMMARY")
+		fmt.Println(strings.Repeat("-", 100))
+	}
 
 	for _, issue := range issues {
 		status := issue.Status
@@ -144,12 +186,35 @@ func displayTaskListTable(issues []models.Issue, total int) error {
 			status = status[:9] + "..."
 		}
 
+		assignee := "Unassigned"
+		if issue.Assignee != nil {
+			assignee = issue.Assignee.DisplayName
+			if len(assignee) > 18 {
+				assignee = assignee[:15] + "..."
+			}
+		}
+
 		summary := issue.Summary
+		if showOwners {
+			// Show owners in summary if available
+			if len(issue.Owners) > 0 {
+				ownerNames := []string{}
+				for _, o := range issue.Owners {
+					ownerNames = append(ownerNames, o.DisplayName)
+				}
+				ownerStr := strings.Join(ownerNames, ", ")
+				if len(ownerStr) > 30 {
+					ownerStr = ownerStr[:27] + "..."
+				}
+				summary = fmt.Sprintf("[%s] %s", ownerStr, summary)
+			}
+		}
+
 		if len(summary) > 40 {
 			summary = summary[:37] + "..."
 		}
 
-		fmt.Printf("%-12s %-10s %-12s %s\n", issue.Key, issue.Type, status, summary)
+		fmt.Printf("%-12s %-10s %-12s %-20s %s\n", issue.Key, issue.Type, status, assignee, summary)
 	}
 
 	fmt.Printf("\nShowing %d of %d issues\n", len(issues), total)
@@ -241,7 +306,11 @@ func runTaskView(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating client: %w", err)
 	}
 
-	issue, err := client.GetIssue(key)
+	// Get project config for owner field
+	project, _ := cfg.GetProject(cfg.DefaultProject)
+	ownerFieldID := project.MultiOwnerField
+
+	issue, err := client.GetIssue(key, ownerFieldID)
 	if err != nil {
 		return err
 	}
@@ -251,12 +320,14 @@ func runTaskView(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Type: %s\n", issue.Type)
 	fmt.Printf("Status: %s\n", issue.Status)
 	if issue.Assignee != nil {
-		fmt.Printf("Assignee: %s\n", issue.Assignee.DisplayName)
+		fmt.Printf("Assignee: %s (%s)\n", issue.Assignee.DisplayName, issue.Assignee.Email)
+	} else {
+		fmt.Println("Assignee: Unassigned")
 	}
 	if len(issue.Owners) > 0 {
 		var ownerNames []string
 		for _, o := range issue.Owners {
-			ownerNames = append(ownerNames, o.DisplayName)
+			ownerNames = append(ownerNames, fmt.Sprintf("%s (%s)", o.DisplayName, o.Email))
 		}
 		fmt.Printf("Owners: %s\n", strings.Join(ownerNames, ", "))
 	}

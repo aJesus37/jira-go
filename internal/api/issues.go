@@ -87,11 +87,11 @@ func (c *Client) CreateIssue(projectKey, summary, description, issueType string)
 	}
 
 	// Fetch the full issue to return complete data
-	return c.GetIssue(result.Key)
+	return c.GetIssue(result.Key, "")
 }
 
 // GetIssue retrieves an issue by key
-func (c *Client) GetIssue(key string) (*models.Issue, error) {
+func (c *Client) GetIssue(key string, ownerFieldID string) (*models.Issue, error) {
 	resp, err := c.Get(fmt.Sprintf("/rest/api/3/issue/%s", key))
 	if err != nil {
 		return nil, fmt.Errorf("getting issue: %w", err)
@@ -111,18 +111,24 @@ func (c *Client) GetIssue(key string) (*models.Issue, error) {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
-	issue := rawIssue.ToIssue()
+	issue := rawIssue.ToIssueWithOwners(ownerFieldID)
 	return &issue, nil
 }
 
 // SearchIssues searches for issues using JQL
-func (c *Client) SearchIssues(jql string, startAt, maxResults int) (*IssueSearchResponse, error) {
+func (c *Client) SearchIssues(jql string, startAt, maxResults int, ownerFieldID string) (*IssueSearchResponse, error) {
+	// Build fields list
+	fields := "summary,status,assignee,created,updated,issuetype,description,labels"
+	if ownerFieldID != "" {
+		fields = fields + "," + ownerFieldID
+	}
+
 	// Build query parameters
 	params := fmt.Sprintf("jql=%s&startAt=%d&maxResults=%d&fields=%s",
 		url.QueryEscape(jql),
 		startAt,
 		maxResults,
-		url.QueryEscape("summary,status,assignee,created,updated,issuetype,description,labels"))
+		url.QueryEscape(fields))
 
 	resp, err := c.Get("/rest/api/3/search/jql?" + params)
 	if err != nil {
@@ -140,9 +146,9 @@ func (c *Client) SearchIssues(jql string, startAt, maxResults int) (*IssueSearch
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
-	// Convert RawIssues to Issues
+	// Convert RawIssues to Issues with owners
 	for _, raw := range result.RawIssues {
-		issue := raw.ToIssue()
+		issue := raw.ToIssueWithOwners(ownerFieldID)
 		result.Issues = append(result.Issues, issue)
 	}
 

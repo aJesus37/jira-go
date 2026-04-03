@@ -42,14 +42,18 @@ func runTUIList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating client: %w", err)
 	}
 
+	// Get project config for owner field
+	project, _ := cfg.GetProject(projectKey)
+	ownerFieldID := project.MultiOwnerField
+
 	// Fetch issues
 	jql := fmt.Sprintf("project = %s ORDER BY updated DESC", projectKey)
-	resp, err := client.SearchIssues(jql, 0, 50)
+	resp, err := client.SearchIssues(jql, 0, 50, ownerFieldID)
 	if err != nil {
 		return fmt.Errorf("searching issues: %w", err)
 	}
 
 	// Launch TUI
-	model := tui.NewIssueList(resp.Issues, client, projectKey)
+	model := tui.NewIssueList(resp.Issues, client, projectKey, ownerFieldID)
 	return tui.Run(model)
 }

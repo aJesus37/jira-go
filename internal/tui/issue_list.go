@@ -26,17 +26,22 @@ var (
 	helpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#808080")).
 			Italic(true)
+
+	assigneeStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#00A8E8"))
 )
 
 // Issue represents a simplified issue for TUI display
 type Issue struct {
-	Key         string
-	Summary     string
-	Type        string
-	Status      string
-	Assignee    string
-	Description string
-	Created     string
+	Key           string
+	Summary       string
+	Type          string
+	Status        string
+	Assignee      string
+	AssigneeEmail string
+	Owners        []string
+	Description   string
+	Created       string
 }
 
 // IssueItem represents a list item for an issue
@@ -49,31 +54,42 @@ func (i IssueItem) Title() string {
 }
 
 func (i IssueItem) Description() string {
-	desc := i.issue.Status
+	parts := []string{i.issue.Status}
+
 	if i.issue.Assignee != "" {
-		desc += " • " + i.issue.Assignee
+		parts = append(parts, "👤 "+i.issue.Assignee)
 	}
-	return desc
+
+	if len(i.issue.Owners) > 0 {
+		ownerStr := strings.Join(i.issue.Owners, ", ")
+		if len(ownerStr) > 30 {
+			ownerStr = ownerStr[:27] + "..."
+		}
+		parts = append(parts, "👥 "+ownerStr)
+	}
+
+	return strings.Join(parts, " • ")
 }
 
 func (i IssueItem) FilterValue() string {
-	return i.issue.Key + " " + i.issue.Summary
+	return i.issue.Key + " " + i.issue.Summary + " " + i.issue.Assignee
 }
 
 // IssueListModel is the TUI model for listing issues
 type IssueListModel struct {
-	list       list.Model
-	issues     []Issue
-	client     *api.Client
-	projectKey string
-	viewing    bool
-	selected   Issue
-	width      int
-	height     int
+	list         list.Model
+	issues       []Issue
+	client       *api.Client
+	projectKey   string
+	ownerFieldID string
+	viewing      bool
+	selected     Issue
+	width        int
+	height       int
 }
 
 // NewIssueList creates a new issue list TUI
-func NewIssueList(issues []models.Issue, client *api.Client, projectKey string) IssueListModel {
+func NewIssueList(issues []models.Issue, client *api.Client, projectKey, ownerFieldID string) IssueListModel {
 	var items []list.Item
 	var tuiIssues []Issue
 
@@ -88,13 +104,24 @@ func NewIssueList(issues []models.Issue, client *api.Client, projectKey string) 
 
 		if issue.Assignee != nil {
 			tuiIssue.Assignee = issue.Assignee.DisplayName
+			tuiIssue.AssigneeEmail = issue.Assignee.Email
+		}
+
+		for _, owner := range issue.Owners {
+			tuiIssue.Owners = append(tuiIssue.Owners, owner.DisplayName)
 		}
 
 		tuiIssues = append(tuiIssues, tuiIssue)
 		items = append(items, IssueItem{issue: tuiIssue})
 	}
 
-	l := list.New(items, list.NewDefaultDelegate(), 80, 20)
+	// Custom delegate to show more info
+	delegate := list.NewDefaultDelegate()
+	delegate.ShowDescription = true
+	delegate.Styles.NormalDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("#808080"))
+	delegate.Styles.SelectedDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
+
+	l := list.New(items, delegate, 100, 20)
 	l.Title = fmt.Sprintf("Jira Issues - %s", projectKey)
 	l.SetShowStatusBar(true)
 	l.SetFilteringEnabled(true)
@@ -102,11 +129,12 @@ func NewIssueList(issues []models.Issue, client *api.Client, projectKey string) 
 	l.SetShowHelp(true)
 
 	return IssueListModel{
-		list:       l,
-		issues:     tuiIssues,
-		client:     client,
-		projectKey: projectKey,
-		viewing:    false,
+		list:         l,
+		issues:       tuiIssues,
+		client:       client,
+		projectKey:   projectKey,
+		ownerFieldID: ownerFieldID,
+		viewing:      false,
 	}
 }
 
@@ -140,11 +168,16 @@ func (m IssueListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected = item.issue
 				// Fetch full issue details
 				if m.client != nil {
-					fullIssue, err := m.client.GetIssue(item.issue.Key)
+					fullIssue, err := m.client.GetIssue(item.issue.Key, m.ownerFieldID)
 					if err == nil && fullIssue != nil {
 						m.selected.Description = fullIssue.Description
 						if fullIssue.Assignee != nil {
 							m.selected.Assignee = fullIssue.Assignee.DisplayName
+							m.selected.AssigneeEmail = fullIssue.Assignee.Email
+						}
+						m.selected.Owners = []string{}
+						for _, o := range fullIssue.Owners {
+							m.selected.Owners = append(m.selected.Owners, fmt.Sprintf("%s (%s)", o.DisplayName, o.Email))
 						}
 					}
 				}
@@ -156,7 +189,7 @@ func (m IssueListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.list.SetSize(msg.Width, msg.Height-4)
+		m.list.SetSize(msg.Width, m.height-4)
 	}
 
 	var cmd tea.Cmd
@@ -182,9 +215,21 @@ func (m IssueListModel) detailView() string {
 	b.WriteString("\n\n")
 	b.WriteString(fmt.Sprintf("Type: %s\n", m.selected.Type))
 	b.WriteString(fmt.Sprintf("Status: %s\n", m.selected.Status))
+
 	if m.selected.Assignee != "" {
-		b.WriteString(fmt.Sprintf("Assignee: %s\n", m.selected.Assignee))
+		b.WriteString(assigneeStyle.Render(fmt.Sprintf("👤 Assignee: %s", m.selected.Assignee)))
+		if m.selected.AssigneeEmail != "" {
+			b.WriteString(fmt.Sprintf(" (%s)", m.selected.AssigneeEmail))
+		}
+		b.WriteString("\n")
+	} else {
+		b.WriteString("👤 Assignee: Unassigned\n")
 	}
+
+	if len(m.selected.Owners) > 0 {
+		b.WriteString(fmt.Sprintf("👥 Owners: %s\n", strings.Join(m.selected.Owners, ", ")))
+	}
+
 	b.WriteString(fmt.Sprintf("Created: %s\n", m.selected.Created))
 	b.WriteString("\n" + strings.Repeat("─", 60) + "\n")
 	b.WriteString("Description:\n\n")
