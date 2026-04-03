@@ -23,17 +23,17 @@ task install
 ## Architecture
 
 ```
-cmd/jira-go/          # Main entry point
+cmd/jira/          # Main entry point (binary named 'jira')
 internal/
 ├── commands/         # Cobra CLI commands
 │   ├── root.go       # Root command with global flags
 │   ├── init.go       # Interactive configuration setup
-│   ├── task.go       # Task CRUD operations
+│   ├── task.go       # Task CRUD operations (includes TUI mode)
 │   ├── cache.go      # Cache management
 │   ├── project.go    # Project switching/config
 │   ├── sprint.go     # Sprint operations
 │   ├── ceremony.go   # Agile ceremonies (planning, retro, daily)
-│   ├── tui.go        # TUI launcher
+│   ├── install.go    # Install command
 │   └── version.go    # Version info
 ├── config/           # Configuration management
 │   ├── config.go     # YAML + env var config with validation
@@ -98,7 +98,7 @@ Jira natively only supports a single assignee. Multi-owner support is implemente
 
 1. Create custom field in Jira (Multi User Picker type)
 2. Note the field ID (e.g., `customfield_10001`)
-3. Configure in `jira-go init`
+3. Configure in `jira init`
 4. Use `--owners` flag with comma-separated emails
 
 ## Testing
@@ -182,17 +182,17 @@ accountID, err := c.GetUserMapping(email)
 
 ### Enable Verbose Output
 ```bash
-jira-go -v task list
+jira -v task list
 ```
 
 ### Bypass Cache
 ```bash
-jira-go --no-cache task list
+jira --no-cache task list
 ```
 
 ### Custom Cache TTL
 ```bash
-jira-go --cache-ttl=5m task list
+jira --cache-ttl=5m task list
 ```
 
 ### View Cache Contents
@@ -201,7 +201,7 @@ jira-go --cache-ttl=5m task list
 sqlite3 ~/.cache/jira-go/cache.db
 
 # Or use cache command
-jira-go cache status
+jira cache status
 ```
 
 ## Build & Release
@@ -209,7 +209,7 @@ jira-go cache status
 ### Build with Version Info
 ```bash
 task build
-# Binary: ./build/jira-go
+# Binary: ./build/jira (named 'jira' for ease of use, but all refs are 'jira-go')
 ```
 
 ### Version Injection
@@ -281,13 +281,13 @@ task build
 ### SQLite Issues
 ```bash
 # Clear cache if corrupted
-jira-go cache clear
+jira cache clear
 ```
 
 ### Config Issues
 ```bash
 # Check config location
-jira-go init  # Re-run setup
+jira init  # Re-run setup
 
 # Or edit directly
 cat ~/.config/jira-go/config.yaml

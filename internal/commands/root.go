@@ -19,9 +19,9 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "jira-go",
+	Use:   "jira",
 	Short: "A CLI tool for managing Jira Software projects",
-	Long: `jira-go is a comprehensive CLI for Jira Software that supports
+	Long: `jira is a comprehensive CLI for Jira Software that supports
 task management, sprint operations, epics, and agile ceremonies.
 
 By default, commands run in interactive TUI mode.
@@ -46,7 +46,7 @@ func runDefault(cmd *cobra.Command, args []string) error {
 
 	if os.IsNotExist(err) {
 		// No config found, run init
-		fmt.Println("No configuration found. Let's set up jira-go!")
+		fmt.Println("No configuration found. Let's set up jira!")
 		fmt.Println()
 		return runInit(cmd, args)
 	}

@@ -26,7 +26,13 @@ Use --no-interactive flag for plain text output suitable for automation.
 
 Filter by assignee or owner email:
   jira-go task list --assignee "user@example.com"
-  jira-go task list --owner "user@example.com"`,
+  jira-go task list --owner "user@example.com"
+
+Show only active tasks (exclude status category 'Done'):
+  jira-go task list --active
+
+Show only backlog tasks (not in sprint):
+  jira-go task list --backlog`,
 	RunE: runTaskList,
 }
 
@@ -70,6 +76,8 @@ func init() {
 	taskListCmd.Flags().String("assignee", "", "Filter by assignee email")
 	taskListCmd.Flags().String("owner", "", "Filter by owner email (multi-owner field)")
 	taskListCmd.Flags().String("status", "", "Filter by status")
+	taskListCmd.Flags().Bool("active", false, "Show only active tasks (exclude status category 'Done')")
+	taskListCmd.Flags().Bool("backlog", false, "Show only backlog tasks (not in any sprint)")
 	taskListCmd.Flags().Int("limit", 50, "Maximum results (default 50 for interactive mode)")
 
 	// Create flags
@@ -127,6 +135,16 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 		jql += fmt.Sprintf(" AND status = '%s'", status)
 	}
 
+	// Filter for active tasks only (exclude done status category)
+	if active, _ := cmd.Flags().GetBool("active"); active {
+		jql += " AND statusCategory != Done"
+	}
+
+	// Filter for backlog tasks only (not in any sprint)
+	if backlog, _ := cmd.Flags().GetBool("backlog"); backlog {
+		jql += " AND sprint is EMPTY"
+	}
+
 	// Get project config for owner field
 	project, _ := cfg.GetProject(projectKey)
 	ownerFieldID := project.MultiOwnerField
@@ -145,7 +163,7 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 		limit = 50 // Default limit
 	}
 
-	resp, err := client.SearchIssues(jql, 0, limit, ownerFieldID)
+	resp, err := client.SearchIssues(jql, 0, limit, ownerFieldID, project.SprintField)
 	if err != nil {
 		return fmt.Errorf("searching issues: %w", err)
 	}
@@ -170,7 +188,7 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Run in interactive TUI mode
-	model := tui.NewIssueList(resp.Issues, client, projectKey, ownerFieldID)
+	model := tui.NewIssueList(resp.Issues, client, projectKey, ownerFieldID, project.SprintField, project.BoardID)
 	return tui.Run(model)
 }
 
@@ -313,7 +331,7 @@ func runTaskView(cmd *cobra.Command, args []string) error {
 	project, _ := cfg.GetProject(cfg.DefaultProject)
 	ownerFieldID := project.MultiOwnerField
 
-	issue, err := client.GetIssue(key, ownerFieldID)
+	issue, err := client.GetIssue(key, ownerFieldID, project.SprintField)
 	if err != nil {
 		return err
 	}

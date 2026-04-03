@@ -167,7 +167,7 @@ func runEpicView(cmd *cobra.Command, args []string) error {
 	}
 
 	// Get child issues
-	issues, err := client.GetEpicIssues(epicKey, project.MultiOwnerField)
+	issues, err := client.GetEpicIssues(epicKey, project.MultiOwnerField, project.SprintField)
 	if err != nil {
 		return fmt.Errorf("fetching epic issues: %w", err)
 	}

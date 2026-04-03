@@ -1,4 +1,4 @@
-# jira-go
+# jira
 
 A comprehensive CLI tool for managing Jira Software projects with support for task/sprint/epic management, agile ceremonies, and a beautiful TUI powered by Charmbracelet.
 
@@ -18,22 +18,42 @@ A comprehensive CLI tool for managing Jira Software projects with support for ta
 ### From Source
 
 ```bash
-git clone https://github.com/user/jira-go
-cd jira-go
+git clone https://github.com/user/jira
+cd jira
 task build
-task install
+```
+
+Then install to your system:
+
+```bash
+# Install to user-local directory (no admin required)
+./build/jira install
+
+# Or install system-wide (may require sudo/admin)
+./build/jira install --global
 ```
 
 ### Download Binary
 
-Download the latest release from the releases page.
+Download the latest release from the releases page, then run:
+
+```bash
+jira install
+```
+
+The installer will:
+- Detect your operating system
+- Install to a user-local directory by default (no admin privileges needed)
+- Automatically elevate permissions only if required (for `--global` installs)
+- Add installation path instructions if not in your PATH
 
 ## Quick Start
 
 ### 1. Initialize Configuration
 
 ```bash
-jira-go init
+jira init
+# Or install to system: jira install
 ```
 
 This interactive wizard will guide you through:
@@ -46,7 +66,7 @@ This interactive wizard will guide you through:
 ### 2. Verify Connection
 
 ```bash
-jira-go task list
+jira task list
 ```
 
 ## Usage
@@ -55,70 +75,70 @@ jira-go task list
 
 ```bash
 # List tasks
-jira-go task list
-jira-go task list --assignee user@example.com
-jira-go task list --status "In Progress"
+jira task list
+jira task list --assignee user@example.com
+jira task list --status "In Progress"
 
 # Create a task
-jira-go task create --summary "Fix login bug" --type Bug --assignee dev@example.com
+jira task create --summary "Fix login bug" --type Bug --assignee dev@example.com
 
 # Create with multiple owners
-jira-go task create --summary "Refactor API" --owners "dev1@example.com,dev2@example.com"
+jira task create --summary "Refactor API" --owners "dev1@example.com,dev2@example.com"
 
 # View task details
-jira-go task view PROJ-123
+jira task view PROJ-123
 
 # Edit a task
-jira-go task edit PROJ-123 --summary "Updated summary"
+jira task edit PROJ-123 --summary "Updated summary"
 
 # Delete a task
-jira-go task delete PROJ-123
+jira task delete PROJ-123
 ```
 
 ### TUI Mode
 
 ```bash
 # Interactive issue browser
-jira-go tui list
+jira task list
 ```
 
 ### Project Management
 
 ```bash
 # List configured projects
-jira-go project list
+jira project list
 
 # Switch default project
-jira-go project switch OTHER
+jira project switch OTHER
 
 # View project config
-jira-go project config
+jira project config
 ```
 
 ### Cache Management
 
 ```bash
 # View cache status
-jira-go cache status
+jira cache status
 
 # Clear cache
-jira-go cache clear
+jira cache clear
 
 # Show cache path
-jira-go cache path
+jira cache path
 ```
 
 ### Agile Ceremonies
 
 ```bash
 # Sprint planning
-jira-go ceremony planning
+jira ceremony planning
 
 # Retrospective
-jira-go ceremony retro
+jira ceremony retro
 
 # Daily standup
-jira-go ceremony daily
+jira ceremony daily
 ```
 
 ## Configuration
@@ -158,7 +178,7 @@ Jira only supports a single assignee per issue. To enable multiple owners:
 1. Go to Jira Project Settings → Issue Types → Fields
 2. Create a custom field: "Additional Owners" (Multi User Picker type)
 3. Note the field ID (e.g., `customfield_10001`)
-4. Run `jira-go init` again and enter the field ID
+4. Run `jira init` again and enter the field ID
 5. Use `--owners` flag when creating/editing tasks
 
 ## Global Flags

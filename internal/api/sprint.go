@@ -4,6 +4,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -33,6 +34,28 @@ func (c *Client) GetSprints(boardID int, state string) ([]models.Sprint, error) 
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("get sprints failed: %s", resp.Status)
+	}
+
+	var result SprintListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return result.Values, nil
+}
+
+// GetOpenSprints gets all open (active + future) sprints for a board
+func (c *Client) GetOpenSprints(boardID int) ([]models.Sprint, error) {
+	endpoint := fmt.Sprintf("/rest/agile/1.0/board/%d/sprint?state=active,future", boardID)
+
+	resp, err := c.Get(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("fetching open sprints: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("get open sprints failed: %s", resp.Status)
 	}
 
 	var result SprintListResponse
@@ -82,12 +105,28 @@ func (c *Client) CreateSprint(boardID int, name string, goal string, startDate, 
 
 // StartSprint starts a sprint
 func (c *Client) StartSprint(sprintID int, goal string) error {
+	// First fetch the sprint to get required fields
+	currentSprint, err := c.GetSprint(sprintID)
+	if err != nil {
+		return fmt.Errorf("fetching current sprint: %w", err)
+	}
+
 	payload := map[string]interface{}{
-		"state": "active",
+		"originBoardId": currentSprint.OriginBoardID,
+		"state":         "active",
+		"name":          currentSprint.Name,
 	}
 
 	if goal != "" {
 		payload["goal"] = goal
+	}
+
+	// Include dates if they exist
+	if !currentSprint.StartDate.IsZero() {
+		payload["startDate"] = currentSprint.StartDate.Time().Format("2006-01-02T15:04:05.000Z0700")
+	}
+	if !currentSprint.EndDate.IsZero() {
+		payload["endDate"] = currentSprint.EndDate.Time().Format("2006-01-02T15:04:05.000Z0700")
 	}
 
 	resp, err := c.Put(fmt.Sprintf("/rest/agile/1.0/sprint/%d", sprintID), payload)
@@ -97,7 +136,8 @@ func (c *Client) StartSprint(sprintID int, goal string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("start sprint failed: %s", resp.Status)
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("start sprint failed: %s - %s", resp.Status, string(body))
 	}
 
 	return nil
@@ -105,8 +145,24 @@ func (c *Client) StartSprint(sprintID int, goal string) error {
 
 // CompleteSprint completes a sprint
 func (c *Client) CompleteSprint(sprintID int) error {
+	// First fetch the sprint to get required fields
+	currentSprint, err := c.GetSprint(sprintID)
+	if err != nil {
+		return fmt.Errorf("fetching current sprint: %w", err)
+	}
+
 	payload := map[string]interface{}{
-		"state": "closed",
+		"originBoardId": currentSprint.OriginBoardID,
+		"state":         "closed",
+		"name":          currentSprint.Name,
+	}
+
+	// Include dates if they exist
+	if !currentSprint.StartDate.IsZero() {
+		payload["startDate"] = currentSprint.StartDate.Time().Format("2006-01-02T15:04:05.000Z0700")
+	}
+	if !currentSprint.EndDate.IsZero() {
+		payload["endDate"] = currentSprint.EndDate.Time().Format("2006-01-02T15:04:05.000Z0700")
 	}
 
 	resp, err := c.Put(fmt.Sprintf("/rest/agile/1.0/sprint/%d", sprintID), payload)
@@ -116,14 +172,89 @@ func (c *Client) CompleteSprint(sprintID int) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("complete sprint failed: %s", resp.Status)
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("complete sprint failed: %s - %s", resp.Status, string(body))
 	}
 
 	return nil
 }
 
+// GetSprint retrieves a single sprint by ID
+func (c *Client) GetSprint(sprintID int) (*models.Sprint, error) {
+	resp, err := c.Get(fmt.Sprintf("/rest/agile/1.0/sprint/%d", sprintID))
+	if err != nil {
+		return nil, fmt.Errorf("fetching sprint: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("get sprint failed: %s", resp.Status)
+	}
+
+	var sprint models.Sprint
+	if err := json.NewDecoder(resp.Body).Decode(&sprint); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return &sprint, nil
+}
+
+// UpdateSprint updates sprint properties (name, goal, dates)
+func (c *Client) UpdateSprint(sprintID int, name, goal string, startDate, endDate time.Time) (*models.Sprint, error) {
+	// First fetch the sprint to get the originBoardId (required for updates)
+	currentSprint, err := c.GetSprint(sprintID)
+	if err != nil {
+		return nil, fmt.Errorf("fetching current sprint: %w", err)
+	}
+
+	payload := map[string]interface{}{
+		"originBoardId": currentSprint.OriginBoardID,
+		"state":         currentSprint.State,
+		"name":          currentSprint.Name,
+	}
+
+	if name != "" {
+		payload["name"] = name
+	}
+	if goal != "" {
+		payload["goal"] = goal
+	}
+
+	// Use provided dates or keep existing ones
+	if !startDate.IsZero() {
+		payload["startDate"] = startDate.Format("2006-01-02T15:04:05.000Z0700")
+	} else if !currentSprint.StartDate.IsZero() {
+		payload["startDate"] = currentSprint.StartDate.Time().Format("2006-01-02T15:04:05.000Z0700")
+	}
+
+	if !endDate.IsZero() {
+		payload["endDate"] = endDate.Format("2006-01-02T15:04:05.000Z0700")
+	} else if !currentSprint.EndDate.IsZero() {
+		payload["endDate"] = currentSprint.EndDate.Time().Format("2006-01-02T15:04:05.000Z0700")
+	}
+
+	resp, err := c.Put(fmt.Sprintf("/rest/agile/1.0/sprint/%d", sprintID), payload)
+	if err != nil {
+		return nil, fmt.Errorf("updating sprint: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		// Try to read error body
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("update sprint failed: %s - %s", resp.Status, string(body))
+	}
+
+	var sprint models.Sprint
+	if err := json.NewDecoder(resp.Body).Decode(&sprint); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return &sprint, nil
+}
+
 // GetSprintIssues retrieves issues in a sprint
-func (c *Client) GetSprintIssues(sprintID int, ownerFieldID string) ([]models.Issue, error) {
+func (c *Client) GetSprintIssues(sprintID int, ownerFieldID string, sprintFieldID string) ([]models.Issue, error) {
 	fields := "summary,status,assignee,created,updated,issuetype,description,labels"
 	if ownerFieldID != "" {
 		fields = fields + "," + ownerFieldID
@@ -146,10 +277,10 @@ func (c *Client) GetSprintIssues(sprintID int, ownerFieldID string) ([]models.Is
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
-	// Convert RawIssues to Issues with owners
+	// Convert RawIssues to Issues with owners and sprint
 	var issues []models.Issue
 	for _, raw := range result.RawIssues {
-		issue := raw.ToIssueWithOwners(ownerFieldID)
+		issue := raw.ToIssueWithOwners(ownerFieldID, sprintFieldID)
 		issues = append(issues, issue)
 	}
 

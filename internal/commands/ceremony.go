@@ -3,19 +3,19 @@ package commands
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/user/jira-go/internal/api"
 	"github.com/user/jira-go/internal/config"
+	"github.com/user/jira-go/internal/models"
 	"github.com/user/jira-go/internal/tui"
 )
 
 var ceremonyCmd = &cobra.Command{
 	Use:   "ceremony",
 	Short: "Run agile ceremonies",
-	Long:  `Interactive tools for sprint planning, retrospectives, and daily standups.`,
+	Long:  `Interactive tools for sprint planning and daily standups.`,
 }
 
 var ceremonyPlanningCmd = &cobra.Command{
@@ -24,23 +24,20 @@ var ceremonyPlanningCmd = &cobra.Command{
 	RunE:  runCeremonyPlanning,
 }
 
-var ceremonyRetroCmd = &cobra.Command{
-	Use:   "retro",
-	Short: "Run retrospective ceremony",
-	RunE:  runCeremonyRetro,
-}
-
 var ceremonyDailyCmd = &cobra.Command{
 	Use:   "daily",
 	Short: "Run daily standup",
 	RunE:  runCeremonyDaily,
 }
 
+var dailyTimerDuration time.Duration
+
 func init() {
 	rootCmd.AddCommand(ceremonyCmd)
 	ceremonyCmd.AddCommand(ceremonyPlanningCmd)
-	ceremonyCmd.AddCommand(ceremonyRetroCmd)
 	ceremonyCmd.AddCommand(ceremonyDailyCmd)
+
+	ceremonyDailyCmd.Flags().DurationVar(&dailyTimerDuration, "timer", 2*time.Minute, "Timer duration per person (e.g., 2m, 5m, 1h)")
 }
 
 func runCeremonyPlanning(cmd *cobra.Command, args []string) error {
@@ -59,7 +56,7 @@ func runCeremonyPlanning(cmd *cobra.Command, args []string) error {
 
 	// Fetch backlog issues
 	jql := fmt.Sprintf("project = %s AND sprint is EMPTY", projectKey)
-	resp, err := client.SearchIssues(jql, 0, 100, project.MultiOwnerField)
+	resp, err := client.SearchIssues(jql, 0, 100, project.MultiOwnerField, project.SprintField)
 	if err != nil {
 		return fmt.Errorf("fetching backlog: %w", err)
 	}
@@ -80,67 +77,100 @@ func runCeremonyPlanning(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Export results
-	export := model.ExportPlanning()
-	filename := fmt.Sprintf("sprint-planning-%s.md", time.Now().Format("2006-01-02"))
-	if err := os.WriteFile(filename, []byte(export), 0644); err != nil {
-		return fmt.Errorf("exporting planning: %w", err)
-	}
-
-	fmt.Printf("✓ Planning exported to %s\n", filename)
-	return nil
-}
-
-func runCeremonyRetro(cmd *cobra.Command, args []string) error {
-	if noInteractiveFlag {
-		fmt.Println("📝 Retrospective")
-		fmt.Println("\nRun without --no-interactive for full TUI")
-		return nil
-	}
-
-	// Launch retrospective TUI
-	model := tui.NewRetrospectiveCeremony()
-
-	if err := tui.Run(model); err != nil {
-		return err
-	}
-
-	// Export results
-	export := model.ExportRetrospective()
-	filename := fmt.Sprintf("retrospective-%s.md", time.Now().Format("2006-01-02"))
-	if err := os.WriteFile(filename, []byte(export), 0644); err != nil {
-		return fmt.Errorf("exporting retrospective: %w", err)
-	}
-
-	fmt.Printf("✓ Retrospective exported to %s\n", filename)
 	return nil
 }
 
 func runCeremonyDaily(cmd *cobra.Command, args []string) error {
-	// Team members (could be fetched from config or passed as args)
-	members := []string{"Team Member 1", "Team Member 2", "Team Member 3"}
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	projectKey := getProjectKey(cmd, cfg)
+	project, _ := cfg.GetProject(projectKey)
+
+	client, err := api.NewClient(cfg, projectKey)
+	if err != nil {
+		return fmt.Errorf("creating client: %w", err)
+	}
+
+	// Fetch issues from current sprint
+	jql := fmt.Sprintf("project = %s AND sprint in openSprints()", projectKey)
+	resp, err := client.SearchIssues(jql, 0, 100, project.MultiOwnerField, project.SprintField)
+	if err != nil {
+		return fmt.Errorf("fetching sprint issues: %w", err)
+	}
+
+	// Extract unique assignees and group their tasks by status
+	// Uses multi-owner field (Owners) if available, falls back to single assignee (Assignee)
+	assigneeTasks := make(map[string]map[string][]models.Issue)
+	var members []string
+	memberSet := make(map[string]bool)
+
+	for _, issue := range resp.Issues {
+		// Get assignees from multi-owner field or fall back to single assignee
+		var assigneeNames []string
+		if len(issue.Owners) > 0 {
+			// Use multi-owner custom field
+			for _, owner := range issue.Owners {
+				if owner.DisplayName != "" {
+					assigneeNames = append(assigneeNames, owner.DisplayName)
+				}
+			}
+		}
+
+		// Fall back to single assignee if no owners
+		if len(assigneeNames) == 0 {
+			if issue.Assignee != nil && issue.Assignee.DisplayName != "" {
+				assigneeNames = append(assigneeNames, issue.Assignee.DisplayName)
+			} else {
+				assigneeNames = append(assigneeNames, "Unassigned")
+			}
+		}
+
+		// Group by status
+		status := issue.Status
+		if status == "" {
+			status = "To Do"
+		}
+
+		// Add task to each assignee's task list
+		for _, assigneeName := range assigneeNames {
+			if !memberSet[assigneeName] {
+				memberSet[assigneeName] = true
+				members = append(members, assigneeName)
+				assigneeTasks[assigneeName] = make(map[string][]models.Issue)
+			}
+			assigneeTasks[assigneeName][status] = append(assigneeTasks[assigneeName][status], issue)
+		}
+	}
+
+	if len(members) == 0 {
+		members = []string{"No assignees found"}
+	}
 
 	if noInteractiveFlag {
 		fmt.Println("📅 Daily Standup")
-		fmt.Printf("\nTeam members: %d\n", len(members))
+		fmt.Printf("\nTeam members with tasks: %d\n", len(members))
+		for _, member := range members {
+			fmt.Printf("\n👤 %s\n", member)
+			for status, tasks := range assigneeTasks[member] {
+				fmt.Printf("  [%s] %d tasks\n", status, len(tasks))
+				for _, task := range tasks {
+					fmt.Printf("    - %s: %s\n", task.Key, task.Summary)
+				}
+			}
+		}
 		fmt.Println("\nRun without --no-interactive for full TUI")
 		return nil
 	}
 
-	// Launch standup TUI
-	model := tui.NewDailyStandupCeremony(members)
+	// Launch standup TUI with real data
+	model := tui.NewDailyStandupCeremony(members, assigneeTasks, dailyTimerDuration)
 
 	if err := tui.Run(model); err != nil {
 		return err
 	}
 
-	// Export results
-	export := model.ExportDailyStandup()
-	filename := fmt.Sprintf("daily-standup-%s.md", time.Now().Format("2006-01-02"))
-	if err := os.WriteFile(filename, []byte(export), 0644); err != nil {
-		return fmt.Errorf("exporting standup: %w", err)
-	}
-
-	fmt.Printf("✓ Standup exported to %s\n", filename)
 	return nil
 }

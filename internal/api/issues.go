@@ -87,11 +87,11 @@ func (c *Client) CreateIssue(projectKey, summary, description, issueType string)
 	}
 
 	// Fetch the full issue to return complete data
-	return c.GetIssue(result.Key, "")
+	return c.GetIssue(result.Key, "", "")
 }
 
 // GetIssue retrieves an issue by key
-func (c *Client) GetIssue(key string, ownerFieldID string) (*models.Issue, error) {
+func (c *Client) GetIssue(key string, ownerFieldID string, sprintFieldID string) (*models.Issue, error) {
 	resp, err := c.Get(fmt.Sprintf("/rest/api/3/issue/%s", key))
 	if err != nil {
 		return nil, fmt.Errorf("getting issue: %w", err)
@@ -111,16 +111,19 @@ func (c *Client) GetIssue(key string, ownerFieldID string) (*models.Issue, error
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
-	issue := rawIssue.ToIssueWithOwners(ownerFieldID)
+	issue := rawIssue.ToIssueWithOwners(ownerFieldID, sprintFieldID)
 	return &issue, nil
 }
 
 // SearchIssues searches for issues using JQL
-func (c *Client) SearchIssues(jql string, startAt, maxResults int, ownerFieldID string) (*IssueSearchResponse, error) {
+func (c *Client) SearchIssues(jql string, startAt, maxResults int, ownerFieldID string, sprintFieldID string) (*IssueSearchResponse, error) {
 	// Build fields list
 	fields := "summary,status,assignee,created,updated,issuetype,description,labels"
 	if ownerFieldID != "" {
 		fields = fields + "," + ownerFieldID
+	}
+	if sprintFieldID != "" {
+		fields = fields + "," + sprintFieldID
 	}
 
 	// Build query parameters
@@ -146,9 +149,9 @@ func (c *Client) SearchIssues(jql string, startAt, maxResults int, ownerFieldID 
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
-	// Convert RawIssues to Issues with owners
+	// Convert RawIssues to Issues with owners and sprint
 	for _, raw := range result.RawIssues {
-		issue := raw.ToIssueWithOwners(ownerFieldID)
+		issue := raw.ToIssueWithOwners(ownerFieldID, sprintFieldID)
 		result.Issues = append(result.Issues, issue)
 	}
 
@@ -223,4 +226,86 @@ func (c *Client) UpdateMultiOwnerField(key, fieldID string, accountIDs []string)
 	}
 
 	return c.UpdateIssue(key, fields)
+}
+
+// AddComment adds a comment to an issue
+func (c *Client) AddComment(key, body string) error {
+	payload := map[string]interface{}{
+		"body": map[string]interface{}{
+			"type":    "doc",
+			"version": 1,
+			"content": []map[string]interface{}{
+				{
+					"type": "paragraph",
+					"content": []map[string]interface{}{
+						{
+							"type": "text",
+							"text": body,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resp, err := c.Post(fmt.Sprintf("/rest/api/3/issue/%s/comment", key), payload)
+	if err != nil {
+		return fmt.Errorf("adding comment: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("add comment failed: %s", resp.Status)
+	}
+
+	return nil
+}
+
+// Transition represents a status transition
+type Transition struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// GetTransitions gets available status transitions for an issue
+func (c *Client) GetTransitions(key string) ([]Transition, error) {
+	resp, err := c.Get(fmt.Sprintf("/rest/api/3/issue/%s/transitions", key))
+	if err != nil {
+		return nil, fmt.Errorf("getting transitions: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("get transitions failed: %s", resp.Status)
+	}
+
+	var result struct {
+		Transitions []Transition `json:"transitions"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decoding transitions: %w", err)
+	}
+
+	return result.Transitions, nil
+}
+
+// TransitionIssue transitions an issue to a new status
+func (c *Client) TransitionIssue(key, transitionID string) error {
+	payload := map[string]interface{}{
+		"transition": map[string]string{
+			"id": transitionID,
+		},
+	}
+
+	resp, err := c.Post(fmt.Sprintf("/rest/api/3/issue/%s/transitions", key), payload)
+	if err != nil {
+		return fmt.Errorf("transitioning issue: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("transition issue failed: %s", resp.Status)
+	}
+
+	return nil
 }

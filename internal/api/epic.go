@@ -65,7 +65,7 @@ func (c *Client) GetEpics(projectKey string) ([]Epic, error) {
 }
 
 // GetEpicIssues retrieves issues linked to an epic
-func (c *Client) GetEpicIssues(epicKey string, ownerFieldID string) ([]models.Issue, error) {
+func (c *Client) GetEpicIssues(epicKey string, ownerFieldID string, sprintFieldID string) ([]models.Issue, error) {
 	// JQL to find issues in epic
 	jql := fmt.Sprintf("'Epic Link' = %s", epicKey)
 
@@ -95,7 +95,7 @@ func (c *Client) GetEpicIssues(epicKey string, ownerFieldID string) ([]models.Is
 
 	var issues []models.Issue
 	for _, raw := range result.RawIssues {
-		issue := raw.ToIssueWithOwners(ownerFieldID)
+		issue := raw.ToIssueWithOwners(ownerFieldID, sprintFieldID)
 		issues = append(issues, issue)
 	}
 

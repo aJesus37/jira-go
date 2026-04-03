@@ -14,12 +14,18 @@ import (
 	"github.com/user/jira-go/internal/models"
 )
 
+var (
+	selectedColumnStyle = lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#00C851")).
+		Padding(1)
+)
+
 // CeremonyType represents the type of ceremony
 type CeremonyType int
 
 const (
 	Planning CeremonyType = iota
-	Retrospective
 	DailyStandup
 )
 
@@ -27,8 +33,8 @@ const (
 type CeremonyModel struct {
 	ceremonyType  CeremonyType
 	issues        []models.Issue
-	cards         []RetroCard
 	updates       []StandupUpdate
+	assigneeTasks map[string]map[string][]models.Issue // member -> status -> tasks
 	timer         timer.Model
 	activeTimer   bool
 	timerDuration time.Duration
@@ -38,27 +44,14 @@ type CeremonyModel struct {
 	sprintList  list.Model
 	selectedTab int // 0 = backlog, 1 = sprint
 
-	// For retro
-	currentColumn int // 0 = went well, 1 = improve, 2 = action items
-	cardInput     textarea.Model
-	addingCard    bool
-
 	// For standup
 	currentMember int
 	updateInput   textarea.Model
 	addingUpdate  bool
+	selectedView  int // 0 = tasks view, 1 = update form
 
 	width  int
 	height int
-}
-
-// RetroCard represents a card in retrospective
-type RetroCard struct {
-	ID      int
-	Content string
-	Column  int // 0 = went well, 1 = improve, 2 = action items
-	Votes   int
-	Author  string
 }
 
 // StandupUpdate represents a team member's update
@@ -101,23 +94,8 @@ func NewPlanningCeremony(issues []models.Issue) CeremonyModel {
 	}
 }
 
-// NewRetrospectiveCeremony creates a new retrospective ceremony TUI
-func NewRetrospectiveCeremony() CeremonyModel {
-	input := textarea.New()
-	input.Placeholder = "Enter your card..."
-	input.SetWidth(50)
-	input.SetHeight(3)
-
-	return CeremonyModel{
-		ceremonyType:  Retrospective,
-		cards:         []RetroCard{},
-		cardInput:     input,
-		currentColumn: 0,
-	}
-}
-
 // NewDailyStandupCeremony creates a new daily standup ceremony TUI
-func NewDailyStandupCeremony(members []string) CeremonyModel {
+func NewDailyStandupCeremony(members []string, assigneeTasks map[string]map[string][]models.Issue, timerDuration time.Duration) CeremonyModel {
 	input := textarea.New()
 	input.Placeholder = "What did you do yesterday? What's your plan for today? Any blockers?"
 	input.SetWidth(60)
@@ -128,16 +106,23 @@ func NewDailyStandupCeremony(members []string) CeremonyModel {
 		updates = append(updates, StandupUpdate{Name: member})
 	}
 
-	t := timer.NewWithInterval(2*time.Minute, time.Second)
+	// Default to 2 minutes if not specified
+	if timerDuration <= 0 {
+		timerDuration = 2 * time.Minute
+	}
+
+	t := timer.NewWithInterval(timerDuration, time.Second)
 
 	return CeremonyModel{
 		ceremonyType:  DailyStandup,
 		updates:       updates,
+		assigneeTasks: assigneeTasks,
 		updateInput:   input,
 		currentMember: 0,
+		selectedView:  0,
 		timer:         t,
 		activeTimer:   false,
-		timerDuration: 2 * time.Minute,
+		timerDuration: timerDuration,
 	}
 }
 
@@ -167,8 +152,6 @@ func (m CeremonyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.ceremonyType {
 		case Planning:
 			return m.updatePlanning(msg)
-		case Retrospective:
-			return m.updateRetrospective(msg)
 		case DailyStandup:
 			return m.updateDailyStandup(msg)
 		}
@@ -240,56 +223,6 @@ func (m CeremonyModel) updatePlanning(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m CeremonyModel) updateRetrospective(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.addingCard {
-		switch msg.String() {
-		case "esc":
-			m.addingCard = false
-		case "enter":
-			// Add card
-			content := m.cardInput.Value()
-			if content != "" {
-				m.cards = append(m.cards, RetroCard{
-					ID:      len(m.cards),
-					Content: content,
-					Column:  m.currentColumn,
-					Votes:   0,
-				})
-				m.cardInput.SetValue("")
-			}
-			m.addingCard = false
-		default:
-			var cmd tea.Cmd
-			m.cardInput, cmd = m.cardInput.Update(msg)
-			return m, cmd
-		}
-		return m, nil
-	}
-
-	if msg.String() == "q" || msg.String() == "esc" {
-		return m, tea.Quit
-	}
-
-	switch msg.String() {
-	case "1":
-		m.currentColumn = 0
-	case "2":
-		m.currentColumn = 1
-	case "3":
-		m.currentColumn = 2
-	case "a":
-		m.addingCard = true
-		m.cardInput.Focus()
-	case "v":
-		// Vote on card under cursor
-	case "e":
-		// Export retrospective
-		return m, tea.Quit
-	}
-
-	return m, nil
-}
-
 func (m CeremonyModel) updateDailyStandup(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.addingUpdate {
 		switch msg.String() {
@@ -327,13 +260,23 @@ func (m CeremonyModel) updateDailyStandup(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.currentMember >= len(m.updates) {
 			m.currentMember = 0
 		}
+		m.selectedView = 0
 	case "p":
 		// Previous member
 		m.currentMember--
 		if m.currentMember < 0 {
 			m.currentMember = len(m.updates) - 1
 		}
+		m.selectedView = 0
+	case "tab":
+		// Toggle between task view and update view
+		if m.selectedView == 0 {
+			m.selectedView = 1
+		} else {
+			m.selectedView = 0
+		}
 	case "a":
+		m.selectedView = 1
 		m.addingUpdate = true
 		m.updateInput.Focus()
 	case "t":
@@ -354,8 +297,6 @@ func (m CeremonyModel) View() string {
 	switch m.ceremonyType {
 	case Planning:
 		return m.viewPlanning()
-	case Retrospective:
-		return m.viewRetrospective()
 	case DailyStandup:
 		return m.viewDailyStandup()
 	default:
@@ -403,61 +344,6 @@ func (m CeremonyModel) viewPlanning() string {
 	return b.String()
 }
 
-func (m CeremonyModel) viewRetrospective() string {
-	var b strings.Builder
-
-	b.WriteString(titleStyle.Render(" 📝 Retrospective "))
-	b.WriteString("\n\n")
-
-	// Show columns
-	columns := []string{"✅ Went Well", "⚠️  Improve", "🎯 Action Items"}
-
-	for i, colName := range columns {
-		style := columnStyle
-		if i == m.currentColumn {
-			style = selectedColumnStyle
-		}
-
-		// Count cards in this column
-		cardCount := 0
-		for _, card := range m.cards {
-			if card.Column == i {
-				cardCount++
-			}
-		}
-
-		colTitle := fmt.Sprintf("%s (%d)", colName, cardCount)
-
-		var cardsContent strings.Builder
-		for _, card := range m.cards {
-			if card.Column == i {
-				cardsContent.WriteString(fmt.Sprintf("• %s", card.Content))
-				if card.Votes > 0 {
-					cardsContent.WriteString(fmt.Sprintf(" (+%d)", card.Votes))
-				}
-				cardsContent.WriteString("\n")
-			}
-		}
-
-		colContent := style.Width(25).Render(colTitle + "\n" + strings.Repeat("─", 23) + "\n" + cardsContent.String())
-		b.WriteString(colContent)
-		b.WriteString("  ")
-	}
-
-	b.WriteString("\n\n")
-
-	// Show card input if adding
-	if m.addingCard {
-		b.WriteString("Add card to " + columns[m.currentColumn] + ":\n")
-		b.WriteString(m.cardInput.View())
-		b.WriteString("\n")
-	}
-
-	b.WriteString(helpStyle.Render("1/2/3: select column • a: add card • v: vote • e: export • q: quit"))
-
-	return b.String()
-}
-
 func (m CeremonyModel) viewDailyStandup() string {
 	var b strings.Builder
 
@@ -469,40 +355,149 @@ func (m CeremonyModel) viewDailyStandup() string {
 		b.WriteString(fmt.Sprintf("⏱️  Time remaining: %s\n\n", m.timer.View()))
 	}
 
-	// Show team checklist
-	b.WriteString("Team Members:\n")
-	for i, member := range m.updates {
-		prefix := "  ○ "
+	if m.currentMember >= len(m.updates) {
+		return b.String()
+	}
+
+	member := m.updates[m.currentMember]
+
+	// Two-column layout: sidebar + main content
+	sidebarWidth := 25
+	mainWidth := m.width - sidebarWidth - 5
+	if mainWidth < 40 {
+		mainWidth = 40
+	}
+
+	// Build sidebar with team members
+	var sidebar strings.Builder
+	sidebar.WriteString(lipgloss.NewStyle().Bold(true).Render("Team"))
+	sidebar.WriteString("\n\n")
+	for i, u := range m.updates {
+		prefix := "○ "
+		style := lipgloss.NewStyle()
 		if i == m.currentMember {
-			prefix = "  ● "
+			prefix = "● "
+			style = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00C851"))
 		}
-		if member.Today != "" {
-			prefix = "  ✓ "
+		if u.Today != "" {
+			prefix = "✓ "
 		}
-		b.WriteString(fmt.Sprintf("%s%s\n", prefix, member.Name))
+		sidebar.WriteString(style.Render(fmt.Sprintf("%s%s\n", prefix, u.Name)))
 	}
 
-	b.WriteString("\n")
+	sidebarStyle := lipgloss.NewStyle().
+		Width(sidebarWidth).
+		PaddingRight(2)
 
-	// Show current member
-	if m.currentMember < len(m.updates) {
-		member := m.updates[m.currentMember]
-		b.WriteString(fmt.Sprintf("Current: %s\n", member.Name))
-		b.WriteString(strings.Repeat("─", 40) + "\n")
+	// Build main content - either tasks view or update form
+	var mainContent strings.Builder
+
+	if m.selectedView == 1 || m.addingUpdate {
+		// Update form view
+		mainContent.WriteString(lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("📝 Update for %s", member.Name)))
+		mainContent.WriteString("\n")
+		mainContent.WriteString(strings.Repeat("─", mainWidth))
+		mainContent.WriteString("\n\n")
 
 		if member.Today != "" {
-			b.WriteString(fmt.Sprintf("Today's update:\n%s\n\n", member.Today))
+			mainContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#808080")).Render("Previous update:"))
+			mainContent.WriteString("\n")
+			mainContent.WriteString(member.Today)
+			mainContent.WriteString("\n\n")
 		}
 
-		if m.addingUpdate {
-			b.WriteString("Enter update:\n")
-			b.WriteString(m.updateInput.View())
-			b.WriteString("\n")
+		mainContent.WriteString(m.updateInput.View())
+	} else {
+		// Tasks view
+		mainContent.WriteString(lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("👤 %s's Tasks", member.Name)))
+		mainContent.WriteString("\n")
+		mainContent.WriteString(strings.Repeat("─", mainWidth))
+		mainContent.WriteString("\n")
+
+		// Show tasks grouped by status
+		tasksByStatus := m.assigneeTasks[member.Name]
+		statusOrder := []string{"Done", "In Progress", "To Do", "Blocked", "Review"}
+		statusColors := map[string]string{
+			"Done":        "#00C851",
+			"In Progress": "#00A8E8",
+			"To Do":       "#808080",
+			"Blocked":     "#FF4444",
+			"Review":      "#FFA500",
+		}
+
+		hasTasks := false
+		for _, status := range statusOrder {
+			tasks := tasksByStatus[status]
+			if len(tasks) == 0 {
+				continue
+			}
+			hasTasks = true
+
+			color := statusColors[status]
+			if color == "" {
+				color = "#808080"
+			}
+
+			statusStyle := lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color(color))
+
+			mainContent.WriteString(fmt.Sprintf("\n%s (%d)\n", statusStyle.Render(status), len(tasks)))
+
+			for _, task := range tasks {
+				taskStyle := lipgloss.NewStyle().
+					Width(mainWidth - 2)
+
+				keyStyle := lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#a277ff"))
+
+				taskLine := fmt.Sprintf("  %s %s",
+					keyStyle.Render(task.Key),
+					task.Summary)
+
+				mainContent.WriteString(taskStyle.Render(taskLine) + "\n")
+			}
+		}
+
+		if !hasTasks {
+			mainContent.WriteString("\n")
+			mainContent.WriteString(lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#808080")).
+				Italic(true).
+				Render("No tasks assigned in current sprint"))
+			mainContent.WriteString("\n")
+		}
+
+		// Show current update if exists
+		if member.Today != "" {
+			mainContent.WriteString("\n")
+			mainContent.WriteString(lipgloss.NewStyle().Bold(true).Render("📝 Today's Update"))
+			mainContent.WriteString("\n")
+			mainContent.WriteString(strings.Repeat("─", mainWidth))
+			mainContent.WriteString("\n")
+			mainContent.WriteString(member.Today)
+			mainContent.WriteString("\n")
 		}
 	}
 
-	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("n: next • p: previous • a: add update • t: toggle timer • e: export • q: quit"))
+	mainStyle := lipgloss.NewStyle().Width(mainWidth)
+
+	// Combine sidebar and main content
+	row := lipgloss.JoinHorizontal(lipgloss.Top,
+		sidebarStyle.Render(sidebar.String()),
+		mainStyle.Render(mainContent.String()),
+	)
+	b.WriteString(row)
+	b.WriteString("\n\n")
+
+	// Help text
+	if m.addingUpdate {
+		b.WriteString(helpStyle.Render("enter: save • esc: cancel"))
+	} else if m.selectedView == 1 {
+		b.WriteString(helpStyle.Render("esc: back to tasks • enter: save update"))
+	} else {
+		b.WriteString(helpStyle.Render("n: next • p: prev • a: add update • tab: toggle view • t: timer • q: quit"))
+	}
 
 	return b.String()
 }
@@ -511,70 +506,9 @@ func (m CeremonyModel) GetTitle() string {
 	switch m.ceremonyType {
 	case Planning:
 		return "Sprint Planning"
-	case Retrospective:
-		return "Retrospective"
 	case DailyStandup:
 		return "Daily Standup"
 	default:
 		return "Ceremony"
 	}
-}
-
-// ExportPlanning exports planning results as markdown
-func (m CeremonyModel) ExportPlanning() string {
-	var b strings.Builder
-	b.WriteString("# Sprint Planning\n\n")
-	b.WriteString(fmt.Sprintf("Date: %s\n\n", time.Now().Format("2006-01-02")))
-
-	b.WriteString("## Sprint Issues\n\n")
-	for _, item := range m.sprintList.Items() {
-		if issue, ok := item.(IssueItem); ok {
-			b.WriteString(fmt.Sprintf("- **%s**: %s\n", issue.issue.Key, issue.issue.Summary))
-		}
-	}
-
-	return b.String()
-}
-
-// ExportRetrospective exports retrospective results as markdown
-func (m CeremonyModel) ExportRetrospective() string {
-	var b strings.Builder
-	b.WriteString("# Retrospective\n\n")
-	b.WriteString(fmt.Sprintf("Date: %s\n\n", time.Now().Format("2006-01-02")))
-
-	columns := []string{"Went Well", "To Improve", "Action Items"}
-	for i, colName := range columns {
-		b.WriteString(fmt.Sprintf("## %s\n\n", colName))
-		for _, card := range m.cards {
-			if card.Column == i {
-				b.WriteString(fmt.Sprintf("- %s", card.Content))
-				if card.Votes > 0 {
-					b.WriteString(fmt.Sprintf(" (%d votes)", card.Votes))
-				}
-				b.WriteString("\n")
-			}
-		}
-		b.WriteString("\n")
-	}
-
-	return b.String()
-}
-
-// ExportDailyStandup exports standup results as markdown
-func (m CeremonyModel) ExportDailyStandup() string {
-	var b strings.Builder
-	b.WriteString("# Daily Standup\n\n")
-	b.WriteString(fmt.Sprintf("Date: %s\n\n", time.Now().Format("2006-01-02")))
-
-	for _, member := range m.updates {
-		b.WriteString(fmt.Sprintf("## %s\n\n", member.Name))
-		if member.Today != "" {
-			b.WriteString(fmt.Sprintf("**Today:** %s\n\n", member.Today))
-		}
-		if member.Blockers != "" {
-			b.WriteString(fmt.Sprintf("**Blockers:** %s\n\n", member.Blockers))
-		}
-	}
-
-	return b.String()
 }

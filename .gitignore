@@ -1,15 +1,21 @@
 # Binaries
 jira-go
+jira
 *.exe
 *.dll
 *.so
 *.dylib
+
+# Build output
+build/
+dist/
 
 # Test binaries
 *.test
 
 # Output of go coverage
 *.out
+coverage.txt
 
 # Dependency directories
 vendor/
@@ -36,3 +42,9 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Task runner checksums
+.task/
+
+# Documentation artifacts
+docs/swagger.json
