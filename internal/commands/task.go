@@ -337,7 +337,20 @@ func runTaskView(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Created: %s\n", issue.Created.Format("2006-01-02 15:04"))
 	fmt.Println(strings.Repeat("-", 80))
 	fmt.Println("Description:")
-	fmt.Println(issue.Description)
+
+	// Render description with markdown
+	renderer, err := tui.NewMarkdownRenderer(80)
+	if err != nil {
+		// Fallback to plain text
+		fmt.Println(issue.Description)
+	} else {
+		rendered, err := renderer.Render(issue.Description)
+		if err != nil {
+			fmt.Println(issue.Description)
+		} else {
+			fmt.Println(rendered)
+		}
+	}
 	fmt.Println()
 
 	return nil

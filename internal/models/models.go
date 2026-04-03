@@ -46,6 +46,11 @@ func (j JiraTime) Time() time.Time {
 	return time.Time(j)
 }
 
+// IsZero returns true if the time is zero
+func (j JiraTime) IsZero() bool {
+	return time.Time(j).IsZero()
+}
+
 // Issue represents a Jira issue
 type Issue struct {
 	Key         string    `json:"key"`
