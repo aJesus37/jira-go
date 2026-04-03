@@ -3,6 +3,7 @@ module github.com/user/jira-go
 go 1.25.7
 
 require (
+	github.com/mattn/go-sqlite3 v1.14.40
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/term v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
