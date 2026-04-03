@@ -4,7 +4,9 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/user/jira-go/internal/models"
 )
@@ -35,17 +37,37 @@ type CreateIssueResponse struct {
 
 // CreateIssue creates a new issue
 func (c *Client) CreateIssue(projectKey, summary, description, issueType string) (*models.Issue, error) {
-	payload := map[string]interface{}{
-		"fields": map[string]interface{}{
-			"project": map[string]string{
-				"key": projectKey,
-			},
-			"summary":     summary,
-			"description": description,
-			"issuetype": map[string]string{
-				"name": issueType,
-			},
+	fields := map[string]interface{}{
+		"project": map[string]string{
+			"key": projectKey,
 		},
+		"summary": summary,
+		"issuetype": map[string]string{
+			"name": issueType,
+		},
+	}
+
+	// Only add description if provided (Jira requires ADF format, not plain string)
+	if description != "" {
+		fields["description"] = map[string]interface{}{
+			"type":    "doc",
+			"version": 1,
+			"content": []map[string]interface{}{
+				{
+					"type": "paragraph",
+					"content": []map[string]interface{}{
+						{
+							"type": "text",
+							"text": description,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	payload := map[string]interface{}{
+		"fields": fields,
 	}
 
 	resp, err := c.Post("/rest/api/3/issue", payload)
@@ -55,7 +77,8 @@ func (c *Client) CreateIssue(projectKey, summary, description, issueType string)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("create issue failed: %s", resp.Status)
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("create issue failed: %s - %s", resp.Status, string(body))
 	}
 
 	var result CreateIssueResponse
@@ -94,21 +117,22 @@ func (c *Client) GetIssue(key string) (*models.Issue, error) {
 
 // SearchIssues searches for issues using JQL
 func (c *Client) SearchIssues(jql string, startAt, maxResults int) (*IssueSearchResponse, error) {
-	payload := IssueSearchRequest{
-		JQL:        jql,
-		StartAt:    startAt,
-		MaxResults: maxResults,
-		Fields:     []string{"summary", "status", "assignee", "created", "updated", "issuetype", "description", "labels"},
-	}
+	// Build query parameters
+	params := fmt.Sprintf("jql=%s&startAt=%d&maxResults=%d&fields=%s",
+		url.QueryEscape(jql),
+		startAt,
+		maxResults,
+		url.QueryEscape("summary,status,assignee,created,updated,issuetype,description,labels"))
 
-	resp, err := c.Post("/rest/api/3/search", payload)
+	resp, err := c.Get("/rest/api/3/search/jql?" + params)
 	if err != nil {
 		return nil, fmt.Errorf("searching issues: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("search failed: %s", resp.Status)
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("search failed: %s - %s", resp.Status, string(body))
 	}
 
 	var result IssueSearchResponse
