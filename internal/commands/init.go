@@ -51,6 +51,15 @@ func runInit(cmd *cobra.Command, args []string) error {
 	projectKey, _ := reader.ReadString('\n')
 	projectKey = strings.TrimSpace(projectKey)
 
+	// Board ID
+	fmt.Print("Board ID (optional, e.g., 1): ")
+	boardIDStr, _ := reader.ReadString('\n')
+	boardIDStr = strings.TrimSpace(boardIDStr)
+	boardID := 0
+	if boardIDStr != "" {
+		fmt.Sscanf(boardIDStr, "%d", &boardID)
+	}
+
 	// Multi-owner field (optional)
 	fmt.Print("Multi-owner Custom Field ID (optional, e.g., customfield_10001): ")
 	multiOwnerField, _ := reader.ReadString('\n')
@@ -66,6 +75,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		Projects: map[string]config.Project{
 			projectKey: {
 				JiraURL:         jiraURL,
+				BoardID:         boardID,
 				MultiOwnerField: multiOwnerField,
 			},
 		},
