@@ -1,0 +1,38 @@
+# Binaries
+jira-go
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Output of go coverage
+*.out
+
+# Dependency directories
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local config (may contain secrets)
+/config.yaml
+/.config/
+
+# Cache
+/.cache/
+*.db
+
+# Environment
+.env
+.env.local
