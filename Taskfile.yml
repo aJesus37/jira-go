@@ -4,6 +4,16 @@ version: '3'
 vars:
   BINARY_NAME: jira-go
   BUILD_DIR: ./build
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
+  COMMIT:
+    sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
+  BUILD_DATE:
+    sh: date -u +"%Y-%m-%dT%H:%M:%SZ"
+  LDFLAGS: >
+    -X github.com/user/jira-go/internal/commands.version={{.VERSION}}
+    -X github.com/user/jira-go/internal/commands.commit={{.COMMIT}}
+    -X github.com/user/jira-go/internal/commands.buildDate={{.BUILD_DATE}}
 
 tasks:
   default:
@@ -14,7 +24,7 @@ tasks:
     desc: Build the binary
     cmds:
       - mkdir -p {{.BUILD_DIR}}
-      - go build -o {{.BUILD_DIR}}/{{.BINARY_NAME}} ./cmd/jira-go
+      - go build -ldflags "{{.LDFLAGS}}" -o {{.BUILD_DIR}}/{{.BINARY_NAME}} ./cmd/jira-go
     sources:
       - "**/*.go"
       - go.mod
