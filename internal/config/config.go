@@ -56,6 +56,20 @@ func GetConfigPath() string {
 	return filepath.Join(home, ".config", "jira-go", configFileName)
 }
 
+// GetCachePath returns the default cache directory path
+func GetCachePath() string {
+	if envPath := os.Getenv("JIRA_GO_CACHE"); envPath != "" {
+		return envPath
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.Join(os.TempDir(), "jira-go-cache.db")
+	}
+
+	return filepath.Join(home, ".cache", "jira-go", "cache.db")
+}
+
 // Load loads configuration from file and environment
 func Load() (*Config, error) {
 	configPath := GetConfigPath()
@@ -64,7 +78,7 @@ func Load() (*Config, error) {
 		Cache: CacheConfig{
 			Enabled:    true,
 			DefaultTTL: "30m",
-			Location:   filepath.Join(os.TempDir(), "jira-go-cache.db"),
+			Location:   GetCachePath(),
 		},
 	}
 
@@ -83,7 +97,38 @@ func Load() (*Config, error) {
 	// Override with environment variables
 	cfg.overrideFromEnv()
 
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
+
 	return cfg, nil
+}
+
+// Validate checks if the configuration is valid
+func (c *Config) Validate() error {
+	if c.Auth.Email == "" {
+		return fmt.Errorf("email is required (set via config or JIRA_GO_EMAIL env var)")
+	}
+
+	if c.Auth.APIToken == "" {
+		return fmt.Errorf("API token is required (set via config or JIRA_GO_API_TOKEN env var)")
+	}
+
+	if c.DefaultProject == "" {
+		return fmt.Errorf("default project is required (set via config or JIRA_GO_DEFAULT_PROJECT env var)")
+	}
+
+	if _, err := c.GetProject(c.DefaultProject); err != nil {
+		return fmt.Errorf("default project '%s' not found in projects configuration", c.DefaultProject)
+	}
+
+	project, _ := c.GetProject(c.DefaultProject)
+	if project.JiraURL == "" {
+		return fmt.Errorf("Jira URL is required for project %s", c.DefaultProject)
+	}
+
+	return nil
 }
 
 // overrideFromEnv overrides config with environment variables
