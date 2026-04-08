@@ -1,6 +1,6 @@
 # Binaries
-jira-go
-jira
+/jira-go
+/jira
 *.exe
 *.dll
 *.so
