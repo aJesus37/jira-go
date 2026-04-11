@@ -730,7 +730,6 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		if hiddenCount > 0 {
 			// Toggle focus mode
 			m.focusHiddenColumns = !m.focusHiddenColumns
-			m.message = ""
 
 			// After toggle, ensure we have a valid column selected
 			if m.focusHiddenColumns {
