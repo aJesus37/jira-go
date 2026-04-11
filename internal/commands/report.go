@@ -36,12 +36,18 @@ func init() {
 	reportCmd.Flags().String("sprint", "", "Filter: active, future, closed, or sprint ID")
 	reportCmd.Flags().String("assignee", "", "Filter by assignee email")
 	reportCmd.Flags().String("project", "", "Project key (defaults to config)")
+	reportCmd.Flags().Int("limit", 200, "Maximum issues to fetch (default 200)")
 }
 
 func runReport(cmd *cobra.Command, args []string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
+	}
+
+	format, _ := cmd.Flags().GetString("format")
+	if format != "table" && format != "json" {
+		return fmt.Errorf("unknown format %q: must be table or json", format)
 	}
 
 	projectKey := getProjectKey(cmd, cfg)
@@ -63,7 +69,7 @@ func runReport(cmd *cobra.Command, args []string) error {
 		case "closed":
 			jql += " AND sprint in closedSprints()"
 		default:
-			jql += fmt.Sprintf(" AND sprint = %s", sprint)
+			jql += fmt.Sprintf(` AND sprint = "%s"`, sprint)
 		}
 	}
 
@@ -81,7 +87,8 @@ func runReport(cmd *cobra.Command, args []string) error {
 		sprintField = project.SprintField
 	}
 
-	resp, err := client.SearchIssues(jql, 0, 200, ownerField, sprintField)
+	limit, _ := cmd.Flags().GetInt("limit")
+	resp, err := client.SearchIssues(jql, 0, limit, ownerField, sprintField)
 	if err != nil {
 		return fmt.Errorf("searching issues: %w", err)
 	}
@@ -128,12 +135,6 @@ func runReport(cmd *cobra.Command, args []string) error {
 		return summaries[i].Total > summaries[j].Total
 	})
 
-	format, _ := cmd.Flags().GetString("format")
-
-	if format != "table" && format != "json" {
-		return fmt.Errorf("unknown format %q: must be table or json", format)
-	}
-
 	if format == "json" {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
@@ -143,7 +144,7 @@ func runReport(cmd *cobra.Command, args []string) error {
 	// Table output
 	fmt.Printf("\nProject: %s — Active Tasks\n", projectKey)
 	fmt.Println(strings.Repeat("=", 60))
-	fmt.Printf("%-25s %-6s %-10s %-10s\n", "ASSIGNEE", "TOTAL", "AVG DAYS", "OLDEST")
+	fmt.Printf("%-25s %-6s %-10s %-10s\n", "ASSIGNEE", "TOTAL", "AVG DAYS", "MAX DAYS")
 	fmt.Println(strings.Repeat("-", 55))
 	for _, s := range summaries {
 		name := s.Name
