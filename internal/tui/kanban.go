@@ -584,12 +584,28 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "q", "esc":
 		return m, tea.Quit
 	case "left", "h":
-		if m.activeColumn > 0 {
-			m.activeColumn--
+		// Move to previous visible column
+		for {
+			if m.activeColumn > 0 {
+				m.activeColumn--
+			} else {
+				m.activeColumn = len(m.columns) - 1
+			}
+			if !m.columns[m.activeColumn].Hidden {
+				break
+			}
 		}
 	case "right", "l":
-		if m.activeColumn < len(m.columns)-1 {
-			m.activeColumn++
+		// Move to next visible column
+		for {
+			if m.activeColumn < len(m.columns)-1 {
+				m.activeColumn++
+			} else {
+				m.activeColumn = 0
+			}
+			if !m.columns[m.activeColumn].Hidden {
+				break
+			}
 		}
 	case "up", "k":
 		if len(m.columns) > 0 {
