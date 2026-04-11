@@ -273,7 +273,7 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(0)
 		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(0)
 		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(0)
-		l := list.New(items, delegate, 28, 18)
+		l := list.New(items, delegate, 35, 18)
 		l.Title = fmt.Sprintf("%s (%d)", status, len(statusIssues))
 		l.SetShowStatusBar(false)
 		l.SetFilteringEnabled(false)
