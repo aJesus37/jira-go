@@ -353,7 +353,7 @@ func (i KanbanIssueItem) Description() string {
 	if i.issue.Assignee != "" {
 		return "👤 " + i.issue.Assignee
 	}
-	return ""
+	return "👤 Unassigned"
 }
 
 func (i KanbanIssueItem) FilterValue() string {
