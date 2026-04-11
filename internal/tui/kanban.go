@@ -268,11 +268,11 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 		}
 
 		delegate := list.NewDefaultDelegate()
-		// Allow longer titles by not truncating
-		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(0)
-		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(0)
-		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(0)
-		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(0)
+		// Configure to show single line items that expand/contract with column width
+		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(0).Height(1)
+		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(0).Height(1)
+		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(0).Height(1)
+		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(0).Height(1)
 		l := list.New(items, delegate, 35, 18)
 		l.Title = fmt.Sprintf("%s (%d)", status, len(statusIssues))
 		l.SetShowStatusBar(false)
@@ -1260,11 +1260,11 @@ func (m KanbanBoardModel) kanbanView() string {
 
 		// Configure list delegate based on active state
 		delegate := list.NewDefaultDelegate()
-		// Don't truncate content
-		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(0)
-		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(0)
-		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(0)
-		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(0)
+		// Configure to show single line items that expand/contract with column width
+		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(0).Height(1)
+		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(0).Height(1)
+		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(0).Height(1)
+		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(0).Height(1)
 		if isActive && !m.focusHiddenColumns {
 			// Use purple for selected items in active column (only when not focusing hidden columns)
 			delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("#7D56F4"))
