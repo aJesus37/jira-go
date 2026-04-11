@@ -291,6 +291,11 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 			Hidden: hidden,
 			Width:  width,
 		})
+
+		// Apply saved width to list size if set
+		if width > 0 {
+			l.SetSize(width-4, 18)
+		}
 	}
 
 	// Initialize comment input with light text for dark background
@@ -495,22 +500,6 @@ func (m *KanbanBoardModel) saveColumnPrefs() {
 }
 
 func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Handle focus toggle key for cycling between visible and hidden columns
-	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		if keyMsg.String() == "f" || keyMsg.String() == "F" {
-			if m.hiddenCount > 0 {
-				m.focusHiddenColumns = !m.focusHiddenColumns
-				m.message = ""
-				if m.focusHiddenColumns {
-					m.message = "Hidden columns focused"
-				} else {
-					m.message = "Visible columns focused"
-				}
-			}
-			return m, nil
-		}
-	}
-
 	switch msg := msg.(type) {
 	case kanbanTransitionsLoadedMsg:
 		m.loading = false
@@ -576,6 +565,20 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// Handle f key for focus toggle at top level before mode switch
+		if msg.String() == "f" || msg.String() == "F" {
+			if m.hiddenCount > 0 {
+				m.focusHiddenColumns = !m.focusHiddenColumns
+				m.message = ""
+				if m.focusHiddenColumns {
+					m.message = "Hidden columns focused"
+				} else {
+					m.message = "Visible columns focused"
+				}
+			}
+			return m, nil
+		}
+
 		// Handle different modes
 		switch m.mode {
 		case ModeKanbanStatusChange:
