@@ -488,17 +488,21 @@ func (m *KanbanBoardModel) resizeColumn(idx int, delta int) {
 	if m.columns[idx].Width > 50 {
 		m.columns[idx].Width = 50
 	}
-	// Update list size to reflect new width
-	width := m.columns[idx].Width
-	if width < 20 {
-		width = 20
-	}
 	// Calculate list height dynamically to fill available space (same logic as WindowSizeMsg)
 	listHeight := m.height - 8
 	if listHeight < 5 {
 		listHeight = 5
 	}
-	m.columns[idx].List.SetSize(width, listHeight)
+	// Update all visible columns to ensure consistent height
+	for i := range m.columns {
+		if !m.columns[i].Hidden {
+			colWidth := m.columns[i].Width
+			if colWidth < 20 {
+				colWidth = 20
+			}
+			m.columns[i].List.SetSize(colWidth, listHeight)
+		}
+	}
 	m.saveColumnPrefs()
 }
 
