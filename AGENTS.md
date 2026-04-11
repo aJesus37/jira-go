@@ -156,6 +156,43 @@ Column visibility, width, and order are persisted per project:
 - Press `f` to focus hidden columns, then `←/→` to navigate them
 - Press `x` on a hidden column to make it visible
 
+## CLI Command Reference
+
+### Task Commands
+
+| Command | Description |
+|---------|-------------|
+| `jira task list` | List issues (opens TUI by default) |
+| `jira task list --format json` | Machine-readable JSON output (bypasses TUI automatically) |
+| `jira task list --age` | Add a DAYS column showing how long each issue has been in its current status |
+| `jira task create` | Create a new issue interactively |
+| `jira task create --status "Done"` | Create an issue then immediately transition it to that status (useful for retroactive logging) |
+| `jira task status [key] [status]` | Transition an issue to a new status (case-insensitive match) |
+| `jira task status [key] [status] --comment "msg"` | Transition and add a comment in the same step |
+| `jira task comment [key] "message"` | Add a comment to an issue |
+
+### Sprint Commands
+
+| Command | Description |
+|---------|-------------|
+| `jira sprint board` | Interactive kanban board (TUI) |
+| `jira sprint board --no-interactive` | Static display |
+
+### Report Command
+
+```bash
+jira report
+```
+
+PM workload summary per assignee: total active tickets, avg days in status, max days in status, and a per-status breakdown.
+
+| Flag | Description |
+|------|-------------|
+| `--sprint active/future/closed/<id>` | Filter by sprint (active, future, closed, or numeric sprint ID) |
+| `--assignee email` | Filter by a specific person |
+| `--format json` | Machine-readable JSON output |
+| `--limit N` | Max issues to fetch (default 200) |
+
 ## Testing
 
 ### Running Tests
