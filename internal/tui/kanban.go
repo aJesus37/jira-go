@@ -662,6 +662,7 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		// Show hidden columns picker
 		if m.hiddenCount > 0 {
 			m.mode = ModeKanbanColumnSelect
+			m.message = ""
 			// Find first hidden column to start selection
 			for i := range m.columns {
 				if m.columns[i].Hidden {
@@ -789,46 +790,76 @@ func (m KanbanBoardModel) handleColumnSelectKeys(msg tea.KeyMsg) (tea.Model, tea
 		m.mode = ModeKanbanNormal
 		return m, nil
 	case "up", "k":
-		for m.columnSelectIndex > 0 {
-			m.columnSelectIndex--
-			// Skip already visible columns in selection
-			if m.columns[m.columnSelectIndex].Hidden {
-				continue
-			}
-			break
-		}
-	case "down", "j":
-		for m.columnSelectIndex < len(m.columns)-1 {
-			m.columnSelectIndex++
-			if m.columns[m.columnSelectIndex].Hidden {
-				continue
-			}
-			break
-		}
-	case "enter":
-		// Toggle visibility of selected column
-		if m.columnSelectIndex >= 0 && m.columnSelectIndex < len(m.columns) {
-			m.toggleColumnVisibility(m.columnSelectIndex)
-		}
-		m.mode = ModeKanbanNormal
-		return m, nil
-	case "left", "h":
 		// Find previous hidden column
-		for i := m.columnSelectIndex - 1; i >= 0; i-- {
+		if m.columnSelectIndex > 0 {
+			for i := m.columnSelectIndex - 1; i >= 0; i-- {
+				if m.columns[i].Hidden {
+					m.columnSelectIndex = i
+					return m, nil
+				}
+			}
+		}
+		// Wrap around - find last hidden
+		for i := len(m.columns) - 1; i > m.columnSelectIndex; i-- {
 			if m.columns[i].Hidden {
 				m.columnSelectIndex = i
-				break
+				return m, nil
 			}
 		}
-	case "right", "l":
+	case "down", "j":
 		// Find next hidden column
 		for i := m.columnSelectIndex + 1; i < len(m.columns); i++ {
 			if m.columns[i].Hidden {
 				m.columnSelectIndex = i
-				break
+				return m, nil
+			}
+		}
+		// Wrap around - find first hidden
+		for i := 0; i < m.columnSelectIndex; i++ {
+			if m.columns[i].Hidden {
+				m.columnSelectIndex = i
+				return m, nil
+			}
+		}
+	case "enter":
+		// Show selected hidden column (toggle visibility)
+		if m.columnSelectIndex >= 0 && m.columnSelectIndex < len(m.columns) {
+			m.columns[m.columnSelectIndex].Hidden = false
+			m.hiddenCount--
+			m.saveColumnPrefs()
+		}
+		m.mode = ModeKanbanNormal
+		return m, nil
+	case "left", "h":
+		// Same as up
+		for i := m.columnSelectIndex - 1; i >= 0; i-- {
+			if m.columns[i].Hidden {
+				m.columnSelectIndex = i
+				return m, nil
+			}
+		}
+		for i := len(m.columns) - 1; i > m.columnSelectIndex; i-- {
+			if m.columns[i].Hidden {
+				m.columnSelectIndex = i
+				return m, nil
+			}
+		}
+	case "right", "l":
+		// Same as down
+		for i := m.columnSelectIndex + 1; i < len(m.columns); i++ {
+			if m.columns[i].Hidden {
+				m.columnSelectIndex = i
+				return m, nil
+			}
+		}
+		for i := 0; i < m.columnSelectIndex; i++ {
+			if m.columns[i].Hidden {
+				m.columnSelectIndex = i
+				return m, nil
 			}
 		}
 	}
+
 	return m, nil
 }
 
