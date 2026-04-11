@@ -343,6 +343,10 @@ type KanbanIssueItem struct {
 }
 
 func (i KanbanIssueItem) Title() string {
+	// Combine key, summary and assignee on single line
+	if i.issue.Assignee != "" {
+		return fmt.Sprintf("%s: %s 👤 %s", i.issue.Key, i.issue.Summary, i.issue.Assignee)
+	}
 	return fmt.Sprintf("%s: %s", i.issue.Key, i.issue.Summary)
 }
 
