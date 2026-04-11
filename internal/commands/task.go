@@ -63,6 +63,13 @@ var taskDeleteCmd = &cobra.Command{
 	RunE:  runTaskDelete,
 }
 
+var taskStatusCmd = &cobra.Command{
+	Use:   "status [key] [status]",
+	Short: "Transition issue to a new status",
+	Args:  cobra.ExactArgs(2),
+	RunE:  runTaskStatus,
+}
+
 func init() {
 	rootCmd.AddCommand(taskCmd)
 	taskCmd.AddCommand(taskListCmd)
@@ -70,6 +77,8 @@ func init() {
 	taskCmd.AddCommand(taskViewCmd)
 	taskCmd.AddCommand(taskEditCmd)
 	taskCmd.AddCommand(taskDeleteCmd)
+	taskCmd.AddCommand(taskStatusCmd)
+	taskStatusCmd.Flags().String("comment", "", "Optional comment to add with the status change")
 
 	// List flags
 	taskListCmd.Flags().String("project", "", "Project key (defaults to config)")
@@ -456,5 +465,53 @@ func runTaskDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("✓ Deleted %s\n", key)
+	return nil
+}
+
+func runTaskStatus(cmd *cobra.Command, args []string) error {
+	key, targetStatus := args[0], args[1]
+
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	client, err := api.NewClient(cfg, cfg.DefaultProject)
+	if err != nil {
+		return fmt.Errorf("creating client: %w", err)
+	}
+
+	transitions, err := client.GetTransitions(key)
+	if err != nil {
+		return fmt.Errorf("getting transitions: %w", err)
+	}
+
+	var transitionID string
+	for _, t := range transitions {
+		if strings.EqualFold(t.Name, targetStatus) {
+			transitionID = t.ID
+			break
+		}
+	}
+	if transitionID == "" {
+		var names []string
+		for _, t := range transitions {
+			names = append(names, t.Name)
+		}
+		return fmt.Errorf("status %q not found; available: %s", targetStatus, strings.Join(names, ", "))
+	}
+
+	if err := client.TransitionIssue(key, transitionID); err != nil {
+		return fmt.Errorf("transitioning issue: %w", err)
+	}
+	fmt.Printf("✓ %s → %s\n", key, targetStatus)
+
+	if comment, _ := cmd.Flags().GetString("comment"); comment != "" {
+		if err := client.AddComment(key, comment); err != nil {
+			return fmt.Errorf("adding comment: %w", err)
+		}
+		fmt.Printf("✓ Comment added\n")
+	}
+
 	return nil
 }

@@ -55,6 +55,9 @@ func runDefault(cmd *cobra.Command, args []string) error {
 	return runTaskList(cmd, args)
 }
 
+// RootCmd exposes the root command for testing.
+var RootCmd = rootCmd
+
 // Execute runs the root command
 func Execute() error {
 	return rootCmd.Execute()
