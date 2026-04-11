@@ -493,13 +493,10 @@ func (m *KanbanBoardModel) resizeColumn(idx int, delta int) {
 	if width < 20 {
 		width = 20
 	}
-	// Cap list height to fit in terminal (same logic as WindowSizeMsg)
-	listHeight := m.height - 10
-	if listHeight < 8 {
-		listHeight = 8
-	}
-	if listHeight > 20 {
-		listHeight = 20
+	// Calculate list height dynamically to fill available space (same logic as WindowSizeMsg)
+	listHeight := m.height - 8
+	if listHeight < 5 {
+		listHeight = 5
 	}
 	m.columns[idx].List.SetSize(width, listHeight)
 	m.saveColumnPrefs()
@@ -620,15 +617,13 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update column widths - use custom width if set, otherwise calculate
 		if len(m.columns) > 0 {
 			columnWidth := m.calculateColumnWidth()
-			// Cap list height to fit in terminal (leave room for header, message, hidden cols, help)
-			// Header ~3 lines, message ~2 lines, hidden cols row ~2 lines, help ~1 line = ~8 lines
-			listHeight := m.height - 10
-			if listHeight < 8 {
-				listHeight = 8
+			// Calculate list height dynamically to fill available space
+			// Leave room for: header (2), message (2), hidden cols row (1), help (1) = ~6 lines
+			listHeight := m.height - 8
+			if listHeight < 5 {
+				listHeight = 5
 			}
-			if listHeight > 20 {
-				listHeight = 20
-			}
+			// No max cap - use all available vertical space
 			for i := range m.columns {
 				width := columnWidth
 				if m.columns[i].Width > 0 {
