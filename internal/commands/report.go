@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/user/jira-go/internal/api"
 	"github.com/user/jira-go/internal/config"
+	"github.com/user/jira-go/internal/models"
 )
 
 // AssigneeSummary aggregates issue data per person.
@@ -21,6 +22,13 @@ type AssigneeSummary struct {
 	ByStatus   map[string]int `json:"by_status"`
 	AvgAgeDays int            `json:"avg_age_days"`
 	OldestDays int            `json:"oldest_days"`
+}
+
+// SprintReport groups assignee summaries under a sprint.
+type SprintReport struct {
+	Sprint    string            `json:"sprint"`
+	Total     int               `json:"total"`
+	Assignees []AssigneeSummary `json:"assignees"`
 }
 
 var reportCmd = &cobra.Command{
@@ -60,8 +68,9 @@ func runReport(cmd *cobra.Command, args []string) error {
 
 	jql := fmt.Sprintf("project = %s AND statusCategory != Done", projectKey)
 
-	if sprint, _ := cmd.Flags().GetString("sprint"); sprint != "" {
-		switch sprint {
+	sprintFilter, _ := cmd.Flags().GetString("sprint")
+	if sprintFilter != "" {
+		switch sprintFilter {
 		case "active":
 			jql += " AND sprint in openSprints()"
 		case "future":
@@ -69,7 +78,7 @@ func runReport(cmd *cobra.Command, args []string) error {
 		case "closed":
 			jql += " AND sprint in closedSprints()"
 		default:
-			jql += fmt.Sprintf(` AND sprint = "%s"`, sprint)
+			jql += fmt.Sprintf(` AND sprint = "%s"`, sprintFilter)
 		}
 	}
 
@@ -93,9 +102,44 @@ func runReport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("searching issues: %w", err)
 	}
 
-	// Aggregate by assignee
+	if sprintFilter != "" {
+		// Sprint filter provided: flat assignee breakdown
+		summaries := buildAssigneeSummaries(resp.Issues)
+		if format == "json" {
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			return enc.Encode(summaries)
+		}
+		fmt.Printf("\nProject: %s — Active Tasks\n", projectKey)
+		fmt.Println(strings.Repeat("=", 60))
+		printAssigneeTable(summaries)
+		fmt.Printf("\nTotal active: %d\n", len(resp.Issues))
+		return nil
+	}
+
+	// No sprint filter: group by sprint, then show assignee breakdown per sprint
+	sprintReports := buildSprintReports(resp.Issues)
+
+	if format == "json" {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(sprintReports)
+	}
+
+	fmt.Printf("\nProject: %s — Active Tasks by Sprint\n", projectKey)
+	for _, sr := range sprintReports {
+		fmt.Printf("\n%s (%d tickets)\n", sr.Sprint, sr.Total)
+		fmt.Println(strings.Repeat("─", 55))
+		printAssigneeTable(sr.Assignees)
+	}
+	fmt.Printf("\nTotal active: %d\n", len(resp.Issues))
+	return nil
+}
+
+// buildAssigneeSummaries aggregates a slice of issues by assignee.
+func buildAssigneeSummaries(issues []models.Issue) []AssigneeSummary {
 	byAssignee := map[string]*AssigneeSummary{}
-	for _, issue := range resp.Issues {
+	for _, issue := range issues {
 		var email, name string
 		if issue.Assignee != nil {
 			email = issue.Assignee.Email
@@ -123,7 +167,6 @@ func runReport(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Compute averages and sort
 	summaries := make([]AssigneeSummary, 0, len(byAssignee))
 	for _, s := range byAssignee {
 		if s.Total > 0 {
@@ -134,34 +177,70 @@ func runReport(cmd *cobra.Command, args []string) error {
 	sort.Slice(summaries, func(i, j int) bool {
 		return summaries[i].Total > summaries[j].Total
 	})
+	return summaries
+}
 
-	if format == "json" {
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		return enc.Encode(summaries)
+// buildSprintReports groups issues by sprint name, then aggregates by assignee within each sprint.
+func buildSprintReports(issues []models.Issue) []SprintReport {
+	bySprint := map[string][]models.Issue{}
+	sprintOrder := []string{}
+
+	for _, issue := range issues {
+		name := issue.SprintName
+		if name == "" {
+			name = "Backlog"
+		}
+		if _, ok := bySprint[name]; !ok {
+			sprintOrder = append(sprintOrder, name)
+		}
+		bySprint[name] = append(bySprint[name], issue)
 	}
 
-	// Table output
-	fmt.Printf("\nProject: %s — Active Tasks\n", projectKey)
-	fmt.Println(strings.Repeat("=", 60))
-	fmt.Printf("%-25s %-6s %-10s %-10s\n", "ASSIGNEE", "TOTAL", "AVG DAYS", "MAX DAYS")
-	fmt.Println(strings.Repeat("-", 55))
+	// Named sprints alphabetically, Backlog last
+	sort.Slice(sprintOrder, func(i, j int) bool {
+		a, b := sprintOrder[i], sprintOrder[j]
+		if a == "Backlog" {
+			return false
+		}
+		if b == "Backlog" {
+			return true
+		}
+		return a < b
+	})
+
+	reports := make([]SprintReport, 0, len(sprintOrder))
+	for _, sName := range sprintOrder {
+		summaries := buildAssigneeSummaries(bySprint[sName])
+		total := 0
+		for _, s := range summaries {
+			total += s.Total
+		}
+		reports = append(reports, SprintReport{
+			Sprint:    sName,
+			Total:     total,
+			Assignees: summaries,
+		})
+	}
+	return reports
+}
+
+// printAssigneeTable renders the assignee summary table to stdout.
+func printAssigneeTable(summaries []AssigneeSummary) {
+	fmt.Printf("  %-23s %-6s %-10s %-10s\n", "ASSIGNEE", "TOTAL", "AVG DAYS", "MAX DAYS")
+	fmt.Printf("  %s\n", strings.Repeat("-", 53))
 	for _, s := range summaries {
 		name := s.Name
-		if len(name) > 23 {
-			name = name[:20] + "..."
+		if len(name) > 21 {
+			name = name[:18] + "..."
 		}
-		fmt.Printf("%-25s %-6d %-10d %-10d\n", name, s.Total, s.AvgAgeDays, s.OldestDays)
-		// Status breakdown (indented), sorted alphabetically
+		fmt.Printf("  %-23s %-6d %-10d %-10d\n", name, s.Total, s.AvgAgeDays, s.OldestDays)
 		statuses := make([]string, 0, len(s.ByStatus))
 		for st := range s.ByStatus {
 			statuses = append(statuses, st)
 		}
 		sort.Strings(statuses)
 		for _, st := range statuses {
-			fmt.Printf("  %-23s %d\n", st, s.ByStatus[st])
+			fmt.Printf("    %-21s %d\n", st, s.ByStatus[st])
 		}
 	}
-	fmt.Printf("\nTotal active: %d\n", len(resp.Issues))
-	return nil
 }
