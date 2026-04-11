@@ -490,7 +490,15 @@ func (m *KanbanBoardModel) resizeColumn(idx int, delta int) {
 	if width < 20 {
 		width = 20
 	}
-	m.columns[idx].List.SetSize(width, m.height-8)
+	// Cap list height to fit in terminal (same logic as WindowSizeMsg)
+	listHeight := m.height - 10
+	if listHeight < 8 {
+		listHeight = 8
+	}
+	if listHeight > 20 {
+		listHeight = 20
+	}
+	m.columns[idx].List.SetSize(width, listHeight)
 	m.saveColumnPrefs()
 }
 
@@ -572,7 +580,8 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		// Handle f key for focus toggle at top level before mode switch
-		if len(msg.Runes) == 1 && (msg.Runes[0] == 'f' || msg.Runes[0] == 'F') {
+		keyStr := msg.String()
+		if keyStr == "f" || keyStr == "F" {
 			if m.hiddenCount > 0 {
 				m.focusHiddenColumns = !m.focusHiddenColumns
 				m.message = ""
