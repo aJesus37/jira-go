@@ -631,7 +631,22 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	// Handle 'f' key for focus toggle (check before switch to ensure it works)
+	keyStr := msg.String()
+	if keyStr == "f" || keyStr == "F" {
+		if m.hiddenCount > 0 {
+			m.focusHiddenColumns = !m.focusHiddenColumns
+			m.message = ""
+			if m.focusHiddenColumns {
+				m.message = "Hidden columns focused"
+			} else {
+				m.message = "Visible columns focused"
+			}
+		}
+		return m, nil
+	}
+
+	switch keyStr {
 	case "q", "esc":
 		return m, tea.Quit
 	case "left", "h":
@@ -745,17 +760,6 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "-":
 		// Decrease column width
 		m.resizeColumn(m.activeColumn, -5)
-	case "f", "F":
-		// Toggle focus between visible and hidden columns
-		if m.hiddenCount > 0 {
-			m.focusHiddenColumns = !m.focusHiddenColumns
-			m.message = ""
-			if m.focusHiddenColumns {
-				m.message = "Hidden columns focused"
-			} else {
-				m.message = "Visible columns focused"
-			}
-		}
 	}
 
 	return m, nil
