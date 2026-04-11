@@ -172,6 +172,27 @@ func (r *RawIssue) ToIssue() Issue {
 	return issue
 }
 
+func (i *Issue) GetAllParticipants() []User {
+	seen := make(map[string]bool)
+	var result []User
+
+	addUnique := func(u User) {
+		if u.AccountID != "" && !seen[u.AccountID] {
+			seen[u.AccountID] = true
+			result = append(result, u)
+		}
+	}
+
+	for _, o := range i.Owners {
+		addUnique(o)
+	}
+	if i.Assignee != nil {
+		addUnique(*i.Assignee)
+	}
+
+	return result
+}
+
 // ToIssueWithOwners converts a RawIssue to an Issue with owners from custom field
 func (r *RawIssue) ToIssueWithOwners(ownerFieldID string, sprintFieldID string) Issue {
 	issue := r.ToIssue()
