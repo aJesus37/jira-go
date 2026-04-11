@@ -184,7 +184,8 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 
 	// Check if we should run in non-interactive mode
 	if noInteractiveFlag {
-		return displayTaskListTable(resp.Issues, resp.Total, project.MultiOwnerField != "")
+		mergeAssigneeOwner := project.MergeAssigneeOwner == nil || *project.MergeAssigneeOwner
+		return displayTaskListTable(resp.Issues, resp.Total, mergeAssigneeOwner)
 	}
 
 	// Run in interactive TUI mode
@@ -192,14 +193,9 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 	return tui.Run(model)
 }
 
-func displayTaskListTable(issues []models.Issue, total int, showOwners bool) error {
-	if showOwners {
-		fmt.Printf("%-12s %-10s %-12s %-20s %s\n", "KEY", "TYPE", "STATUS", "ASSIGNEE", "SUMMARY")
-		fmt.Println(strings.Repeat("-", 100))
-	} else {
-		fmt.Printf("%-12s %-10s %-12s %-20s %s\n", "KEY", "TYPE", "STATUS", "ASSIGNEE", "SUMMARY")
-		fmt.Println(strings.Repeat("-", 100))
-	}
+func displayTaskListTable(issues []models.Issue, total int, mergeAssigneeOwner bool) error {
+	fmt.Printf("%-12s %-10s %-12s %-20s %s\n", "KEY", "TYPE", "STATUS", "ASSIGNEE", "SUMMARY")
+	fmt.Println(strings.Repeat("-", 100))
 
 	for _, issue := range issues {
 		status := issue.Status
@@ -207,35 +203,30 @@ func displayTaskListTable(issues []models.Issue, total int, showOwners bool) err
 			status = status[:9] + "..."
 		}
 
-		assignee := "Unassigned"
-		if issue.Assignee != nil {
-			assignee = issue.Assignee.DisplayName
-			if len(assignee) > 18 {
-				assignee = assignee[:15] + "..."
+		displayAssignee := "Unassigned"
+		if mergeAssigneeOwner {
+			participants := issue.GetAllParticipants()
+			if len(participants) > 0 {
+				names := []string{}
+				for _, p := range participants {
+					names = append(names, p.DisplayName)
+				}
+				displayAssignee = strings.Join(names, ", ")
 			}
+		} else if issue.Assignee != nil {
+			displayAssignee = issue.Assignee.DisplayName
+		}
+
+		if len(displayAssignee) > 18 {
+			displayAssignee = displayAssignee[:15] + "..."
 		}
 
 		summary := issue.Summary
-		if showOwners {
-			// Show owners in summary if available
-			if len(issue.Owners) > 0 {
-				ownerNames := []string{}
-				for _, o := range issue.Owners {
-					ownerNames = append(ownerNames, o.DisplayName)
-				}
-				ownerStr := strings.Join(ownerNames, ", ")
-				if len(ownerStr) > 30 {
-					ownerStr = ownerStr[:27] + "..."
-				}
-				summary = fmt.Sprintf("[%s] %s", ownerStr, summary)
-			}
-		}
-
 		if len(summary) > 40 {
 			summary = summary[:37] + "..."
 		}
 
-		fmt.Printf("%-12s %-10s %-12s %-20s %s\n", issue.Key, issue.Type, status, assignee, summary)
+		fmt.Printf("%-12s %-10s %-12s %-20s %s\n", issue.Key, issue.Type, status, displayAssignee, summary)
 	}
 
 	fmt.Printf("\nShowing %d of %d issues\n", len(issues), total)
