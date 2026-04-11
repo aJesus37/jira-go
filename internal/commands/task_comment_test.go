@@ -13,8 +13,7 @@ func TestTaskCommentCommandRegistered(t *testing.T) {
 }
 
 func TestTaskCommentRequiresTwoArgs(t *testing.T) {
-	commands.RootCmd.SetArgs([]string{"task", "comment", "PROJ-1"})
-	err := commands.RootCmd.Execute()
+	_, err := executeCommand(commands.RootCmd, "task", "comment", "PROJ-1")
 	if err == nil {
 		t.Fatal("expected error with only one arg (missing message)")
 	}
