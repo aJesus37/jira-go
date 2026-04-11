@@ -9,6 +9,7 @@ import (
 type ColumnConfig struct {
 	Visible bool `json:"visible"`
 	Width   int  `json:"width"`
+	Order   int  `json:"order"`
 }
 
 type BoardColumnPrefs map[string]ColumnConfig

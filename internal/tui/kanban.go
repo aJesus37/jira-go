@@ -3,6 +3,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -236,30 +237,54 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 	}
 
 	// Create columns for whatever statuses exist in the issues
-	statusOrder := []string{"To Do", "In Progress", "Review", "Blocked", "Done"} // Fallback order
 	var columns []KanbanColumn
 
-	// First pass: collect all unique statuses
-	allStatuses := make(map[string]bool)
+	// First pass: collect all unique statuses with their saved order
+	type statusInfo struct {
+		name  string
+		order int
+	}
+	var statusList []statusInfo
 	for status := range statusMap {
-		allStatuses[status] = true
+		savedOrder := -1
+		if colConfig, ok := prefs[status]; ok {
+			savedOrder = colConfig.Order
+		}
+		statusList = append(statusList, statusInfo{name: status, order: savedOrder})
 	}
 
-	// Build column order: known statuses first in preferred order, then any others alphabetically
-	var columnOrder []string
-	knownStatuses := map[string]bool{"To Do": true, "In Progress": true, "Review": true, "Blocked": true, "Done": true}
-	for _, status := range statusOrder {
-		if allStatuses[status] {
-			columnOrder = append(columnOrder, status)
+	// Sort by saved order if available, otherwise use fallback order
+	sort.Slice(statusList, func(i, j int) bool {
+		// If both have saved orders, use them
+		if statusList[i].order >= 0 && statusList[j].order >= 0 {
+			return statusList[i].order < statusList[j].order
 		}
-	}
-	for status := range allStatuses {
-		if !knownStatuses[status] {
-			columnOrder = append(columnOrder, status)
+		// If only one has saved order, prioritize it
+		if statusList[i].order >= 0 {
+			return true
 		}
-	}
+		if statusList[j].order >= 0 {
+			return false
+		}
+		// Neither has saved order, use fallback status order
+		knownStatuses := map[string]int{"To Do": 0, "In Progress": 1, "Review": 2, "Blocked": 3, "Done": 4}
+		iOrder, iKnown := knownStatuses[statusList[i].name]
+		jOrder, jKnown := knownStatuses[statusList[j].name]
+		if iKnown && jKnown {
+			return iOrder < jOrder
+		}
+		if iKnown {
+			return true
+		}
+		if jKnown {
+			return false
+		}
+		// Both unknown, sort alphabetically
+		return statusList[i].name < statusList[j].name
+	})
 
-	for _, status := range columnOrder {
+	for _, info := range statusList {
+		status := info.name
 		statusIssues := statusMap[status]
 		var items []list.Item
 
@@ -512,10 +537,24 @@ func (m *KanbanBoardModel) resizeColumn(idx int, delta int) {
 
 func (m *KanbanBoardModel) saveColumnPrefs() {
 	prefs := make(config.BoardColumnPrefs)
-	for _, col := range m.columns {
+	for i, col := range m.columns {
 		prefs[col.Name] = config.ColumnConfig{
 			Visible: !col.Hidden,
 			Width:   col.Width,
+			Order:   i,
+		}
+	}
+	config.SaveBoardColumns(m.projectKey, prefs)
+}
+
+func (m *KanbanBoardModel) saveColumnOrder() {
+	// Save the current column order
+	prefs := make(config.BoardColumnPrefs)
+	for i, col := range m.columns {
+		prefs[col.Name] = config.ColumnConfig{
+			Visible: !col.Hidden,
+			Width:   col.Width,
+			Order:   i,
 		}
 	}
 	config.SaveBoardColumns(m.projectKey, prefs)
@@ -737,6 +776,20 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			var cmd tea.Cmd
 			m.columns[m.activeColumn].List, cmd = m.columns[m.activeColumn].List.Update(msg)
 			return m, cmd
+		}
+	case "[", "{":
+		// Move column left (swap with previous)
+		if m.activeColumn > 0 {
+			m.columns[m.activeColumn], m.columns[m.activeColumn-1] = m.columns[m.activeColumn-1], m.columns[m.activeColumn]
+			m.activeColumn--
+			m.saveColumnOrder()
+		}
+	case "]", "}":
+		// Move column right (swap with next)
+		if m.activeColumn < len(m.columns)-1 {
+			m.columns[m.activeColumn], m.columns[m.activeColumn+1] = m.columns[m.activeColumn+1], m.columns[m.activeColumn]
+			m.activeColumn++
+			m.saveColumnOrder()
 		}
 	case "s":
 		// Change status
@@ -1316,7 +1369,7 @@ func (m KanbanBoardModel) kanbanView() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(helpStyle.Render("←/→: switch cols • ↑/↓: navigate • f: focus hidden cols • d: details • s: status • c: comment • x: toggle col • +/-: resize • q: quit"))
+	b.WriteString(helpStyle.Render("←/→: switch cols • ↑/↓: navigate • []: move col • f: focus hidden • d: details • s: status • c: comment • x: toggle • +/-: resize • q: quit"))
 
 	return b.String()
 }
