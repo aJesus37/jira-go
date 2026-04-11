@@ -691,6 +691,32 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Ensure activeColumn is always valid for current focus mode
+	// This fixes issues after toggling focus or when state gets inconsistent
+	if m.focusHiddenColumns {
+		// Should be on a hidden column
+		if m.activeColumn >= len(m.columns) || !m.columns[m.activeColumn].Hidden {
+			// Find first hidden column
+			for i, col := range m.columns {
+				if col.Hidden {
+					m.activeColumn = i
+					break
+				}
+			}
+		}
+	} else {
+		// Should be on a visible column
+		if m.activeColumn >= len(m.columns) || m.columns[m.activeColumn].Hidden {
+			// Find first visible column
+			for i, col := range m.columns {
+				if !col.Hidden {
+					m.activeColumn = i
+					break
+				}
+			}
+		}
+	}
+
 	// Handle 'f' key for focus toggle (check before switch to ensure it works)
 	keyStr := msg.String()
 	if keyStr == "f" || keyStr == "F" {
@@ -706,45 +732,21 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			m.focusHiddenColumns = !m.focusHiddenColumns
 			m.message = ""
 
-			// Check if current column is appropriate for new mode
-			currentIsHidden := m.columns[m.activeColumn].Hidden
-
+			// After toggle, ensure we have a valid column selected
 			if m.focusHiddenColumns {
-				// Now focusing hidden columns - if current is already hidden, keep it
-				if !currentIsHidden {
-					// Current is visible, need to find a hidden column
-					// Search forward first
-					for i := m.activeColumn + 1; i < len(m.columns); i++ {
-						if m.columns[i].Hidden {
-							m.activeColumn = i
-							return m, nil
-						}
-					}
-					// Search from beginning
-					for i := 0; i < m.activeColumn; i++ {
-						if m.columns[i].Hidden {
-							m.activeColumn = i
-							return m, nil
-						}
+				// Find first hidden column
+				for i, col := range m.columns {
+					if col.Hidden {
+						m.activeColumn = i
+						break
 					}
 				}
 			} else {
-				// Now focusing visible columns - if current is already visible, keep it
-				if currentIsHidden {
-					// Current is hidden, need to find a visible column
-					// Search forward first
-					for i := m.activeColumn + 1; i < len(m.columns); i++ {
-						if !m.columns[i].Hidden {
-							m.activeColumn = i
-							return m, nil
-						}
-					}
-					// Search from beginning
-					for i := 0; i < m.activeColumn; i++ {
-						if !m.columns[i].Hidden {
-							m.activeColumn = i
-							return m, nil
-						}
+				// Find first visible column
+				for i, col := range m.columns {
+					if !col.Hidden {
+						m.activeColumn = i
+						break
 					}
 				}
 			}
