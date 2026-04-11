@@ -482,8 +482,8 @@ func (m *KanbanBoardModel) resizeColumn(idx int, delta int) {
 		return
 	}
 	m.columns[idx].Width += delta
-	if m.columns[idx].Width < 15 {
-		m.columns[idx].Width = 15
+	if m.columns[idx].Width < 20 {
+		m.columns[idx].Width = 20
 	}
 	if m.columns[idx].Width > 50 {
 		m.columns[idx].Width = 50
@@ -600,14 +600,6 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if hiddenCount > 0 {
 				m.focusHiddenColumns = !m.focusHiddenColumns
-				m.message = ""
-				if m.focusHiddenColumns {
-					m.message = "Hidden columns focused"
-				} else {
-					m.message = "Visible columns focused"
-				}
-			} else {
-				m.message = "No hidden columns to focus"
 			}
 			return m, nil
 		}
