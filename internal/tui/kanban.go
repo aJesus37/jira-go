@@ -152,6 +152,9 @@ type KanbanBoardModel struct {
 	detailIssue  *models.Issue
 	detailVP     viewport.Model
 	detailOffset int
+
+	// Column visibility focus
+	focusHiddenColumns bool
 }
 
 // generateMockTasks creates realistic mock tasks for demonstration
@@ -584,37 +587,69 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "q", "esc":
 		return m, tea.Quit
 	case "left", "h":
-		// Move to previous visible column
-		for {
-			if m.activeColumn > 0 {
-				m.activeColumn--
-			} else {
-				m.activeColumn = len(m.columns) - 1
+		// Move to previous column (respecting focus mode)
+		if m.focusHiddenColumns {
+			// Navigate only through hidden columns
+			for {
+				if m.activeColumn > 0 {
+					m.activeColumn--
+				} else {
+					m.activeColumn = len(m.columns) - 1
+				}
+				if m.columns[m.activeColumn].Hidden {
+					break
+				}
 			}
-			if !m.columns[m.activeColumn].Hidden {
-				break
+		} else {
+			// Navigate only through visible columns
+			for {
+				if m.activeColumn > 0 {
+					m.activeColumn--
+				} else {
+					m.activeColumn = len(m.columns) - 1
+				}
+				if !m.columns[m.activeColumn].Hidden {
+					break
+				}
 			}
 		}
 	case "right", "l":
-		// Move to next visible column
-		for {
-			if m.activeColumn < len(m.columns)-1 {
-				m.activeColumn++
-			} else {
-				m.activeColumn = 0
+		// Move to next column (respecting focus mode)
+		if m.focusHiddenColumns {
+			// Navigate only through hidden columns
+			for {
+				if m.activeColumn < len(m.columns)-1 {
+					m.activeColumn++
+				} else {
+					m.activeColumn = 0
+				}
+				if m.columns[m.activeColumn].Hidden {
+					break
+				}
 			}
-			if !m.columns[m.activeColumn].Hidden {
-				break
+		} else {
+			// Navigate only through visible columns
+			for {
+				if m.activeColumn < len(m.columns)-1 {
+					m.activeColumn++
+				} else {
+					m.activeColumn = 0
+				}
+				if !m.columns[m.activeColumn].Hidden {
+					break
+				}
 			}
 		}
 	case "up", "k":
-		if len(m.columns) > 0 {
+		// Only navigate within visible columns
+		if len(m.columns) > 0 && !m.columns[m.activeColumn].Hidden {
 			var cmd tea.Cmd
 			m.columns[m.activeColumn].List, cmd = m.columns[m.activeColumn].List.Update(msg)
 			return m, cmd
 		}
 	case "down", "j":
-		if len(m.columns) > 0 {
+		// Only navigate within visible columns
+		if len(m.columns) > 0 && !m.columns[m.activeColumn].Hidden {
 			var cmd tea.Cmd
 			m.columns[m.activeColumn].List, cmd = m.columns[m.activeColumn].List.Update(msg)
 			return m, cmd
@@ -662,6 +697,17 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "-":
 		// Decrease column width
 		m.resizeColumn(m.activeColumn, -5)
+	case "tab":
+		// Toggle focus between visible columns and hidden columns row
+		if m.hiddenCount > 0 {
+			m.focusHiddenColumns = !m.focusHiddenColumns
+			m.message = ""
+			if m.focusHiddenColumns {
+				m.message = "Hidden columns focused"
+			} else {
+				m.message = "Visible columns focused"
+			}
+		}
 	}
 
 	return m, nil
@@ -1122,14 +1168,17 @@ func (m KanbanBoardModel) kanbanView() string {
 		// Hidden columns render separately below
 		if col.Hidden {
 			m.hiddenCount++
-			// Add indicator if active, with padding
+			// Add indicator if active (either normally or in focusHiddenColumns mode)
+			isFocused := m.focusHiddenColumns && isActive
 			dimStyle := lipgloss.NewStyle().
 				Padding(0, 2).
 				Foreground(lipgloss.Color("#666666"))
 			activeStyle := lipgloss.NewStyle().
 				Padding(0, 2).
 				Foreground(lipgloss.Color("#7D56F4"))
-			if isActive {
+			if isFocused {
+				hiddenColumns = append(hiddenColumns, activeStyle.Render("▸ "+col.Name))
+			} else if isActive {
 				hiddenColumns = append(hiddenColumns, activeStyle.Render("▸ "+col.Name))
 			} else {
 				hiddenColumns = append(hiddenColumns, dimStyle.Render(col.Name))
@@ -1177,7 +1226,7 @@ func (m KanbanBoardModel) kanbanView() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(helpStyle.Render("←/→: switch cols • ↑/↓: navigate • d: details • s: status • c: comment • a: assignee • x: toggle col • +//-: resize • q: quit"))
+	b.WriteString(helpStyle.Render("←/→: switch cols • ↑/↓: navigate • tab: focus hidden cols • d: details • s: status • c: comment • x: toggle col • +//-: resize • q: quit"))
 
 	return b.String()
 }
