@@ -1216,17 +1216,14 @@ func (m KanbanBoardModel) kanbanView() string {
 		// Hidden columns render separately below
 		if col.Hidden {
 			m.hiddenCount++
-			// Add indicator if active (either normally or in focusHiddenColumns mode)
-			isFocused := m.focusHiddenColumns && isActive
+			// Add indicator only when in focusHiddenColumns mode and this column is active
 			dimStyle := lipgloss.NewStyle().
 				Padding(0, 2).
 				Foreground(lipgloss.Color("#666666"))
 			activeStyle := lipgloss.NewStyle().
 				Padding(0, 2).
 				Foreground(lipgloss.Color("#7D56F4"))
-			if isFocused {
-				hiddenColumns = append(hiddenColumns, activeStyle.Render("▸ "+col.Name))
-			} else if isActive {
+			if m.focusHiddenColumns && isActive {
 				hiddenColumns = append(hiddenColumns, activeStyle.Render("▸ "+col.Name))
 			} else {
 				hiddenColumns = append(hiddenColumns, dimStyle.Render(col.Name))
@@ -1241,9 +1238,9 @@ func (m KanbanBoardModel) kanbanView() string {
 			style = style.Width(columnWidth)
 		}
 
-		// Update column title with indicator if active
+		// Update column title with indicator if active (only when not focusing hidden columns)
 		title := col.List.Title
-		if isActive {
+		if isActive && !m.focusHiddenColumns {
 			title = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Render("▸ " + title)
 		}
 		col.List.Title = title
@@ -1255,8 +1252,8 @@ func (m KanbanBoardModel) kanbanView() string {
 		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(0)
 		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(0)
 		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(0)
-		if isActive {
-			// Use purple for selected items in active column
+		if isActive && !m.focusHiddenColumns {
+			// Use purple for selected items in active column (only when not focusing hidden columns)
 			delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("#7D56F4"))
 			delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("#a277ff"))
 		} else {
