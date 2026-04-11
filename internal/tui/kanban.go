@@ -268,11 +268,13 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 		}
 
 		delegate := list.NewDefaultDelegate()
-		// Configure to show single line items that expand/contract with column width
+		// Configure to show exactly 2 lines per item (title + description), no wrapping
 		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(0).Height(1)
 		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(0).Height(1)
 		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(0).Height(1)
 		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(0).Height(1)
+		// Set spacing to 0 to prevent extra lines between items
+		delegate.SetSpacing(0)
 		l := list.New(items, delegate, 35, 18)
 		l.Title = fmt.Sprintf("%s (%d)", status, len(statusIssues))
 		l.SetShowStatusBar(false)
@@ -343,15 +345,13 @@ type KanbanIssueItem struct {
 }
 
 func (i KanbanIssueItem) Title() string {
-	// Combine key, summary and assignee on single line
-	if i.issue.Assignee != "" {
-		return fmt.Sprintf("%s: %s 👤 %s", i.issue.Key, i.issue.Summary, i.issue.Assignee)
-	}
 	return fmt.Sprintf("%s: %s", i.issue.Key, i.issue.Summary)
 }
 
 func (i KanbanIssueItem) Description() string {
-	// Return empty to keep items single-line
+	if i.issue.Assignee != "" {
+		return "👤 " + i.issue.Assignee
+	}
 	return ""
 }
 
@@ -1262,11 +1262,12 @@ func (m KanbanBoardModel) kanbanView() string {
 
 		// Configure list delegate based on active state
 		delegate := list.NewDefaultDelegate()
-		// Configure to show single line items that expand/contract with column width
+		// Configure to show exactly 2 lines per item (title + description), no wrapping
 		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(0).Height(1)
 		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(0).Height(1)
 		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(0).Height(1)
 		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(0).Height(1)
+		delegate.SetSpacing(0)
 		if isActive && !m.focusHiddenColumns {
 			// Use purple for selected items in active column (only when not focusing hidden columns)
 			delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("#7D56F4"))
