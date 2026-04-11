@@ -268,12 +268,8 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 		}
 
 		delegate := list.NewDefaultDelegate()
-		// Configure to show exactly 2 lines per item (title + description), no wrapping
-		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(0).Height(1)
-		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(0).Height(1)
-		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(0).Height(1)
-		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(0).Height(1)
-		// Set spacing to 0 to prevent extra lines between items
+		// Force 2 lines per item (title + description)
+		delegate.SetHeight(2)
 		delegate.SetSpacing(0)
 		l := list.New(items, delegate, 35, 18)
 		l.Title = fmt.Sprintf("%s (%d)", status, len(statusIssues))
@@ -1262,11 +1258,8 @@ func (m KanbanBoardModel) kanbanView() string {
 
 		// Configure list delegate based on active state
 		delegate := list.NewDefaultDelegate()
-		// Configure to show exactly 2 lines per item (title + description), no wrapping
-		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(0).Height(1)
-		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(0).Height(1)
-		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(0).Height(1)
-		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(0).Height(1)
+		// Force 2 lines per item (title + description)
+		delegate.SetHeight(2)
 		delegate.SetSpacing(0)
 		if isActive && !m.focusHiddenColumns {
 			// Use purple for selected items in active column (only when not focusing hidden columns)
