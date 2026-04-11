@@ -702,46 +702,48 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			}
 		}
 		if hiddenCount > 0 {
+			// Toggle focus mode
 			m.focusHiddenColumns = !m.focusHiddenColumns
 			m.message = ""
-			// Find the closest appropriate column from current position
+
+			// Check if current column is appropriate for new mode
+			currentIsHidden := m.columns[m.activeColumn].Hidden
+
 			if m.focusHiddenColumns {
-				// Looking for hidden column - search from current position first
-				found := false
-				// Search forward from current position
-				for i := m.activeColumn; i < len(m.columns); i++ {
-					if m.columns[i].Hidden {
-						m.activeColumn = i
-						found = true
-						break
+				// Now focusing hidden columns - if current is already hidden, keep it
+				if !currentIsHidden {
+					// Current is visible, need to find a hidden column
+					// Search forward first
+					for i := m.activeColumn + 1; i < len(m.columns); i++ {
+						if m.columns[i].Hidden {
+							m.activeColumn = i
+							return m, nil
+						}
 					}
-				}
-				// If not found, search from beginning
-				if !found {
+					// Search from beginning
 					for i := 0; i < m.activeColumn; i++ {
 						if m.columns[i].Hidden {
 							m.activeColumn = i
-							break
+							return m, nil
 						}
 					}
 				}
 			} else {
-				// Looking for visible column - search from current position first
-				found := false
-				// Search forward from current position
-				for i := m.activeColumn; i < len(m.columns); i++ {
-					if !m.columns[i].Hidden {
-						m.activeColumn = i
-						found = true
-						break
+				// Now focusing visible columns - if current is already visible, keep it
+				if currentIsHidden {
+					// Current is hidden, need to find a visible column
+					// Search forward first
+					for i := m.activeColumn + 1; i < len(m.columns); i++ {
+						if !m.columns[i].Hidden {
+							m.activeColumn = i
+							return m, nil
+						}
 					}
-				}
-				// If not found, search from beginning
-				if !found {
+					// Search from beginning
 					for i := 0; i < m.activeColumn; i++ {
 						if !m.columns[i].Hidden {
 							m.activeColumn = i
-							break
+							return m, nil
 						}
 					}
 				}
