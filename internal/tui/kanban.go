@@ -470,6 +470,11 @@ func (m *KanbanBoardModel) resizeColumn(idx int, delta int) {
 	if m.columns[idx].Width > 50 {
 		m.columns[idx].Width = 50
 	}
+	// Expanding a hidden column makes it visible
+	if delta > 0 && m.columns[idx].Hidden {
+		m.columns[idx].Hidden = false
+		m.hiddenCount--
+	}
 	m.saveColumnPrefs()
 }
 
@@ -485,6 +490,20 @@ func (m *KanbanBoardModel) saveColumnPrefs() {
 }
 
 func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Handle Tab key for cycling column focus
+	if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.Type == tea.KeyTab {
+		if m.hiddenCount > 0 {
+			m.focusHiddenColumns = !m.focusHiddenColumns
+			m.message = ""
+			if m.focusHiddenColumns {
+				m.message = "Hidden columns focused"
+			} else {
+				m.message = "Visible columns focused"
+			}
+		}
+		return m, nil
+	}
+
 	switch msg := msg.(type) {
 	case kanbanTransitionsLoadedMsg:
 		m.loading = false
