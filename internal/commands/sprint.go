@@ -3,6 +3,7 @@ package commands
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -64,9 +65,9 @@ var sprintBoardCmd = &cobra.Command{
 }
 
 var sprintMoveCmd = &cobra.Command{
-	Use:   "move [sprint-id] [issue-keys]",
+	Use:   "move [target-sprint-id] [issue-keys...]",
 	Short: "Move issues to sprint",
-	Args:  cobra.MinimumNArgs(2),
+	Args:  cobra.MinimumNArgs(1),
 	RunE:  runSprintMove,
 }
 
@@ -92,11 +93,51 @@ func init() {
 	// List flags
 	sprintListCmd.Flags().String("state", "", "Filter by state (active, future, closed)")
 
+	// Issues flags
+	sprintIssuesCmd.Flags().String("format", "table", "Output format: table or json")
+	sprintIssuesCmd.Flags().String("status", "", "Filter by status name (e.g. 'Em andamento')")
+	sprintIssuesCmd.Flags().Int("limit", 100, "Maximum issues to fetch")
+
+	// Move flags
+	sprintMoveCmd.Flags().String("from-sprint", "", "Move all non-done issues from this sprint ID")
+
+	// Complete flags
+	sprintCompleteCmd.Flags().String("move-to", "", "Move non-done issues to this sprint ID (or 'future') before completing")
+
 	// Create flags
 	sprintCreateCmd.Flags().String("name", "", "Sprint name (required)")
 	sprintCreateCmd.Flags().String("goal", "", "Sprint goal")
 	sprintCreateCmd.Flags().String("start", "", "Start date (YYYY-MM-DD)")
 	sprintCreateCmd.Flags().String("end", "", "End date (YYYY-MM-DD)")
+}
+
+func resolveSprintID(arg string, client *api.Client, boardID int) (int, error) {
+	switch arg {
+	case "active":
+		sprints, err := client.GetSprints(boardID, "active")
+		if err != nil {
+			return 0, fmt.Errorf("fetching active sprints: %w", err)
+		}
+		if len(sprints) == 0 {
+			return 0, fmt.Errorf("no active sprint found")
+		}
+		return sprints[0].ID, nil
+	case "future":
+		sprints, err := client.GetSprints(boardID, "future")
+		if err != nil {
+			return 0, fmt.Errorf("fetching future sprints: %w", err)
+		}
+		if len(sprints) == 0 {
+			return 0, fmt.Errorf("no future sprint found")
+		}
+		return sprints[0].ID, nil
+	default:
+		id, err := strconv.Atoi(arg)
+		if err != nil {
+			return 0, fmt.Errorf("invalid sprint ID %q: must be a number, 'active', or 'future'", arg)
+		}
+		return id, nil
+	}
 }
 
 func runSprintList(cmd *cobra.Command, args []string) error {
@@ -205,21 +246,25 @@ func runSprintCreate(cmd *cobra.Command, args []string) error {
 }
 
 func runSprintStart(cmd *cobra.Command, args []string) error {
-	sprintID, err := strconv.Atoi(args[0])
-	if err != nil {
-		return fmt.Errorf("invalid sprint ID: %w", err)
-	}
-
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
 	projectKey := getProjectKey(cmd, cfg)
+	project, err := cfg.GetProject(projectKey)
+	if err != nil {
+		return fmt.Errorf("getting project: %w", err)
+	}
 
 	client, err := api.NewClient(cfg, projectKey)
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)
+	}
+
+	sprintID, err := resolveSprintID(args[0], client, project.BoardID)
+	if err != nil {
+		return fmt.Errorf("resolving sprint: %w", err)
 	}
 
 	if err := client.StartSprint(sprintID, ""); err != nil {
@@ -231,24 +276,52 @@ func runSprintStart(cmd *cobra.Command, args []string) error {
 }
 
 func runSprintComplete(cmd *cobra.Command, args []string) error {
-	sprintID, err := strconv.Atoi(args[0])
-	if err != nil {
-		return fmt.Errorf("invalid sprint ID: %w", err)
-	}
-
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
 	projectKey := getProjectKey(cmd, cfg)
+	project, err := cfg.GetProject(projectKey)
+	if err != nil {
+		return fmt.Errorf("getting project: %w", err)
+	}
 
 	client, err := api.NewClient(cfg, projectKey)
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)
 	}
 
-	if err := client.CompleteSprint(sprintID); err != nil {
+	sprintID, err := resolveSprintID(args[0], client, project.BoardID)
+	if err != nil {
+		return fmt.Errorf("resolving sprint: %w", err)
+	}
+
+	if moveTo, _ := cmd.Flags().GetString("move-to"); moveTo != "" {
+		targetID, err := resolveSprintID(moveTo, client, project.BoardID)
+		if err != nil {
+			return fmt.Errorf("resolving --move-to sprint: %w", err)
+		}
+
+		jql := fmt.Sprintf("sprint = %d AND statusCategory != Done", sprintID)
+		resp, err := client.SearchIssues(jql, 0, 500, project.MultiOwnerField, project.SprintField)
+		if err != nil {
+			return fmt.Errorf("fetching non-done issues: %w", err)
+		}
+
+		if len(resp.Issues) > 0 {
+			keys := make([]string, len(resp.Issues))
+			for i, issue := range resp.Issues {
+				keys[i] = issue.Key
+			}
+			if err := client.MoveIssuesToSprint(targetID, keys); err != nil {
+				return fmt.Errorf("moving issues: %w", err)
+			}
+			fmt.Printf("✓ Moved %d non-done issue(s) to sprint %d\n", len(keys), targetID)
+		}
+	}
+
+	if err := client.CompleteSprintSafe(sprintID); err != nil {
 		return fmt.Errorf("completing sprint: %w", err)
 	}
 
@@ -257,15 +330,18 @@ func runSprintComplete(cmd *cobra.Command, args []string) error {
 }
 
 func runSprintIssues(cmd *cobra.Command, args []string) error {
-	sprintID, err := strconv.Atoi(args[0])
-	if err != nil {
-		return fmt.Errorf("invalid sprint ID: %w", err)
-	}
-
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
+
+	format, _ := cmd.Flags().GetString("format")
+	if format != "table" && format != "json" {
+		return fmt.Errorf("unknown format %q: must be table or json", format)
+	}
+
+	statusFilter, _ := cmd.Flags().GetString("status")
+	limit, _ := cmd.Flags().GetInt("limit")
 
 	projectKey := getProjectKey(cmd, cfg)
 	project, _ := cfg.GetProject(projectKey)
@@ -275,7 +351,12 @@ func runSprintIssues(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating client: %w", err)
 	}
 
-	issues, err := client.GetSprintIssues(sprintID, project.MultiOwnerField, project.SprintField)
+	sprintID, err := resolveSprintID(args[0], client, project.BoardID)
+	if err != nil {
+		return fmt.Errorf("resolving sprint: %w", err)
+	}
+
+	issues, total, err := client.GetSprintIssues(sprintID, project.MultiOwnerField, project.SprintField, statusFilter, limit)
 	if err != nil {
 		return fmt.Errorf("fetching sprint issues: %w", err)
 	}
@@ -283,6 +364,12 @@ func runSprintIssues(cmd *cobra.Command, args []string) error {
 	if len(issues) == 0 {
 		fmt.Println("No issues in sprint")
 		return nil
+	}
+
+	if format == "json" {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(issues)
 	}
 
 	fmt.Printf("Issues in sprint %d:\n\n", sprintID)
@@ -294,7 +381,6 @@ func runSprintIssues(cmd *cobra.Command, args []string) error {
 		if len(status) > 12 {
 			status = status[:9] + "..."
 		}
-
 		assignee := "Unassigned"
 		if issue.Assignee != nil {
 			assignee = issue.Assignee.DisplayName
@@ -302,16 +388,18 @@ func runSprintIssues(cmd *cobra.Command, args []string) error {
 				assignee = assignee[:15] + "..."
 			}
 		}
-
 		summary := issue.Summary
 		if len(summary) > 40 {
 			summary = summary[:37] + "..."
 		}
-
 		fmt.Printf("%-12s %-10s %-12s %-20s %s\n", issue.Key, issue.Type, status, assignee, summary)
 	}
 
-	fmt.Printf("\nTotal: %d issues\n", len(issues))
+	if total > len(issues) {
+		fmt.Printf("\nShowing %d of %d issues (use --limit to fetch more)\n", len(issues), total)
+	} else {
+		fmt.Printf("\nTotal: %d issues\n", len(issues))
+	}
 	return nil
 }
 
@@ -372,7 +460,7 @@ func runSprintBoard(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	issues, err := client.GetSprintIssues(sprintID, project.MultiOwnerField, project.SprintField)
+	issues, _, err := client.GetSprintIssues(sprintID, project.MultiOwnerField, project.SprintField, "", 100)
 	if err != nil {
 		return fmt.Errorf("fetching sprint issues: %w", err)
 	}
@@ -414,30 +502,56 @@ func displayKanbanBoard(issues []models.Issue) error {
 }
 
 func runSprintMove(cmd *cobra.Command, args []string) error {
-	sprintID, err := strconv.Atoi(args[0])
-	if err != nil {
-		return fmt.Errorf("invalid sprint ID: %w", err)
-	}
-
-	issueKeys := args[1:]
-
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
 	projectKey := getProjectKey(cmd, cfg)
+	project, _ := cfg.GetProject(projectKey)
 
 	client, err := api.NewClient(cfg, projectKey)
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)
 	}
 
-	if err := client.MoveIssuesToSprint(sprintID, issueKeys); err != nil {
+	targetSprintID, err := resolveSprintID(args[0], client, project.BoardID)
+	if err != nil {
+		return fmt.Errorf("resolving target sprint: %w", err)
+	}
+
+	var issueKeys []string
+
+	fromSprint, _ := cmd.Flags().GetString("from-sprint")
+	if fromSprint != "" {
+		sourceID, err := resolveSprintID(fromSprint, client, project.BoardID)
+		if err != nil {
+			return fmt.Errorf("resolving --from-sprint: %w", err)
+		}
+		jql := fmt.Sprintf("sprint = %d AND statusCategory != Done", sourceID)
+		resp, err := client.SearchIssues(jql, 0, 500, project.MultiOwnerField, project.SprintField)
+		if err != nil {
+			return fmt.Errorf("fetching source sprint issues: %w", err)
+		}
+		for _, issue := range resp.Issues {
+			issueKeys = append(issueKeys, issue.Key)
+		}
+		if len(issueKeys) == 0 {
+			fmt.Println("No non-done issues to move")
+			return nil
+		}
+	} else {
+		if len(args) < 2 {
+			return fmt.Errorf("provide issue keys as arguments, or use --from-sprint to bulk move")
+		}
+		issueKeys = args[1:]
+	}
+
+	if err := client.MoveIssuesToSprint(targetSprintID, issueKeys); err != nil {
 		return fmt.Errorf("moving issues: %w", err)
 	}
 
-	fmt.Printf("✓ Moved %d issue(s) to sprint %d\n", len(issueKeys), sprintID)
+	fmt.Printf("✓ Moved %d issue(s) to sprint %d\n", len(issueKeys), targetSprintID)
 	return nil
 }
 

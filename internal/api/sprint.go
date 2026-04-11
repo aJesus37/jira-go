@@ -179,6 +179,21 @@ func (c *Client) CompleteSprint(sprintID int) error {
 	return nil
 }
 
+// CompleteSprintSafe completes a sprint, automatically starting it first
+// if it is currently in FUTURE state (Jira does not allow FUTURE→CLOSED directly).
+func (c *Client) CompleteSprintSafe(sprintID int) error {
+	sprint, err := c.GetSprint(sprintID)
+	if err != nil {
+		return fmt.Errorf("fetching sprint: %w", err)
+	}
+	if sprint.State == "future" {
+		if err := c.StartSprint(sprintID, ""); err != nil {
+			return fmt.Errorf("starting future sprint before close: %w", err)
+		}
+	}
+	return c.CompleteSprint(sprintID)
+}
+
 // GetSprint retrieves a single sprint by ID
 func (c *Client) GetSprint(sprintID int) (*models.Sprint, error) {
 	resp, err := c.Get(fmt.Sprintf("/rest/agile/1.0/sprint/%d", sprintID))
@@ -253,16 +268,23 @@ func (c *Client) UpdateSprint(sprintID int, name, goal string, startDate, endDat
 	return &sprint, nil
 }
 
-// GetSprintIssues retrieves issues in a sprint using JQL search
-func (c *Client) GetSprintIssues(sprintID int, ownerFieldID string, sprintFieldID string) ([]models.Issue, error) {
+// GetSprintIssues retrieves issues in a sprint using JQL search.
+// Pass limit=0 to use default (100). Pass status="" for no filter.
+func (c *Client) GetSprintIssues(sprintID int, ownerFieldID, sprintFieldID, status string, limit int) ([]models.Issue, int, error) {
 	jql := fmt.Sprintf("sprint = %d", sprintID)
-
-	result, err := c.SearchIssues(jql, 0, 100, ownerFieldID, sprintFieldID)
-	if err != nil {
-		return nil, fmt.Errorf("searching sprint issues: %w", err)
+	if status != "" {
+		jql += fmt.Sprintf(" AND status = %q", status)
+	}
+	if limit <= 0 {
+		limit = 100
 	}
 
-	return result.Issues, nil
+	result, err := c.SearchIssues(jql, 0, limit, ownerFieldID, sprintFieldID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("searching sprint issues: %w", err)
+	}
+
+	return result.Issues, result.Total, nil
 }
 
 // MoveIssuesToSprint moves issues to a sprint

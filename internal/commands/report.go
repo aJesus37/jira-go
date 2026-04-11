@@ -95,6 +95,10 @@ func runReport(cmd *cobra.Command, args []string) error {
 		ownerField = project.MultiOwnerField
 		sprintField = project.SprintField
 	}
+	if sprintFilter == "" && sprintField == "" {
+		fmt.Fprintln(os.Stderr, "warn: sprint_field not configured for this project — showing flat assignee view instead of sprint grouping")
+		fmt.Fprintln(os.Stderr, "      Run 'jira init' to configure the sprint custom field ID")
+	}
 
 	limit, _ := cmd.Flags().GetInt("limit")
 	resp, err := client.SearchIssues(jql, 0, limit, ownerField, sprintField)
