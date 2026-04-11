@@ -198,17 +198,15 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client) Kan
 				Type:    issue.Type,
 			}
 
-			// Use multi-owner field if available, fall back to single assignee
-			if len(issue.Owners) > 0 {
-				var ownerNames []string
-				for _, owner := range issue.Owners {
-					if owner.DisplayName != "" {
-						ownerNames = append(ownerNames, owner.DisplayName)
+			participants := issue.GetAllParticipants()
+			if len(participants) > 0 {
+				var names []string
+				for _, p := range participants {
+					if p.DisplayName != "" {
+						names = append(names, p.DisplayName)
 					}
 				}
-				if len(ownerNames) > 0 {
-					ki.Assignee = strings.Join(ownerNames, ", ")
-				}
+				ki.Assignee = strings.Join(names, ", ")
 			} else if issue.Assignee != nil {
 				ki.Assignee = issue.Assignee.DisplayName
 			}
@@ -223,9 +221,29 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client) Kan
 		statusMap[ki.Status] = append(statusMap[ki.Status], ki)
 	}
 
-	// Create columns for common statuses
-	columnOrder := []string{"To Do", "In Progress", "Review", "Blocked", "Done"}
+	// Create columns for whatever statuses exist in the issues
+	statusOrder := []string{"To Do", "In Progress", "Review", "Blocked", "Done"} // Fallback order
 	var columns []KanbanColumn
+
+	// First pass: collect all unique statuses
+	allStatuses := make(map[string]bool)
+	for status := range statusMap {
+		allStatuses[status] = true
+	}
+
+	// Build column order: known statuses first in preferred order, then any others alphabetically
+	var columnOrder []string
+	knownStatuses := map[string]bool{"To Do": true, "In Progress": true, "Review": true, "Blocked": true, "Done": true}
+	for _, status := range statusOrder {
+		if allStatuses[status] {
+			columnOrder = append(columnOrder, status)
+		}
+	}
+	for status := range allStatuses {
+		if !knownStatuses[status] {
+			columnOrder = append(columnOrder, status)
+		}
+	}
 
 	for _, status := range columnOrder {
 		statusIssues := statusMap[status]
