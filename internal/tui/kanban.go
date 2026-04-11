@@ -298,9 +298,9 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 			Width:  width,
 		})
 
-		// Apply saved width to list size if set (use full width, not width-4)
+		// Apply saved width to list size if set (use shorter height to fit screen)
 		if width > 0 {
-			l.SetSize(width, 18)
+			l.SetSize(width, 15)
 		}
 	}
 
@@ -608,12 +608,17 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update column widths - use custom width if set, otherwise calculate
 		if len(m.columns) > 0 {
 			columnWidth := m.calculateColumnWidth()
+			// Cap list height to fit in terminal (leave room for header, hidden cols, help)
+			listHeight := m.height - 12
+			if listHeight < 10 {
+				listHeight = 10
+			}
 			for i := range m.columns {
 				width := columnWidth
 				if m.columns[i].Width > 0 {
 					width = m.columns[i].Width
 				}
-				m.columns[i].List.SetSize(width, m.height-8)
+				m.columns[i].List.SetSize(width, listHeight)
 			}
 		}
 	}
