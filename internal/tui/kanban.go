@@ -301,9 +301,13 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 			Width:  width,
 		})
 
-		// Apply saved width to list size if set (use shorter height to fit screen)
+		// Apply saved width to list size if set (use shorter height to fit screen, enforce minimum 25)
 		if width > 0 {
-			l.SetSize(width, 12)
+			itemWidth := width
+			if itemWidth < 25 {
+				itemWidth = 25
+			}
+			l.SetSize(itemWidth, 12)
 		}
 	}
 
@@ -482,8 +486,8 @@ func (m *KanbanBoardModel) resizeColumn(idx int, delta int) {
 		return
 	}
 	m.columns[idx].Width += delta
-	if m.columns[idx].Width < 20 {
-		m.columns[idx].Width = 20
+	if m.columns[idx].Width < 25 {
+		m.columns[idx].Width = 25
 	}
 	if m.columns[idx].Width > 50 {
 		m.columns[idx].Width = 50
@@ -1252,12 +1256,15 @@ func (m KanbanBoardModel) kanbanView() string {
 			continue
 		}
 
-		// Use custom width if set, otherwise use calculated
+		// Use custom width if set, otherwise use calculated (enforce minimum 25)
+		colWidth := columnWidth
 		if col.Width > 0 {
-			style = style.Width(col.Width)
-		} else {
-			style = style.Width(columnWidth)
+			colWidth = col.Width
 		}
+		if colWidth < 25 {
+			colWidth = 25
+		}
+		style = style.Width(colWidth)
 
 		// Update column title with indicator if active (only when not focusing hidden columns)
 		title := col.List.Title
@@ -1271,13 +1278,10 @@ func (m KanbanBoardModel) kanbanView() string {
 		// Force 2 lines per item (title + description)
 		delegate.SetHeight(2)
 		delegate.SetSpacing(1)
-		// Set max width to prevent wrapping and ensure proper truncation
-		itemWidth := columnWidth - 4
-		if col.Width > 0 {
-			itemWidth = col.Width - 4
-		}
-		if itemWidth < 20 {
-			itemWidth = 20
+		// Set max width to prevent wrapping and ensure proper truncation (enforce minimum 25)
+		itemWidth := colWidth - 4
+		if itemWidth < 21 {
+			itemWidth = 21
 		}
 		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(itemWidth)
 		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(itemWidth)
