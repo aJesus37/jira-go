@@ -292,9 +292,9 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 			Width:  width,
 		})
 
-		// Apply saved width to list size if set
+		// Apply saved width to list size if set (use full width, not width-4)
 		if width > 0 {
-			l.SetSize(width-4, 18)
+			l.SetSize(width, 18)
 		}
 	}
 
@@ -484,7 +484,7 @@ func (m *KanbanBoardModel) resizeColumn(idx int, delta int) {
 	if width < 20 {
 		width = 20
 	}
-	m.columns[idx].List.SetSize(width-4, m.height-8)
+	m.columns[idx].List.SetSize(width, m.height-8)
 	m.saveColumnPrefs()
 }
 
@@ -599,11 +599,15 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		// Update column widths dynamically
+		// Update column widths - use custom width if set, otherwise calculate
 		if len(m.columns) > 0 {
 			columnWidth := m.calculateColumnWidth()
 			for i := range m.columns {
-				m.columns[i].List.SetSize(columnWidth-4, m.height-8)
+				width := columnWidth
+				if m.columns[i].Width > 0 {
+					width = m.columns[i].Width
+				}
+				m.columns[i].List.SetSize(width, m.height-8)
 			}
 		}
 	}
