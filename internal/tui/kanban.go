@@ -697,10 +697,8 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "-":
 		// Decrease column width
 		m.resizeColumn(m.activeColumn, -5)
-	}
-
-	// Handle Tab key outside switch (tea.KeyMsg is a type, not a case)
-	if msg.Type == tea.KeyTab {
+	case "\t":
+		// Tab - toggle focus between visible and hidden columns
 		if m.hiddenCount > 0 {
 			m.focusHiddenColumns = !m.focusHiddenColumns
 			m.message = ""
@@ -710,7 +708,6 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 				m.message = "Visible columns focused"
 			}
 		}
-		return m, nil
 	}
 
 	return m, nil
@@ -1189,7 +1186,12 @@ func (m KanbanBoardModel) kanbanView() string {
 			continue
 		}
 
-		style = style.Width(columnWidth)
+		// Use custom width if set, otherwise use calculated
+		if col.Width > 0 {
+			style = style.Width(col.Width)
+		} else {
+			style = style.Width(columnWidth)
+		}
 
 		// Update column title with indicator if active
 		title := col.List.Title
@@ -1229,7 +1231,7 @@ func (m KanbanBoardModel) kanbanView() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(helpStyle.Render("←/→: switch cols • ↑/↓: navigate • tab: focus hidden cols • d: details • s: status • c: comment • x: toggle col • +//-: resize • q: quit"))
+	b.WriteString(helpStyle.Render("←/→: switch cols • ↑/↓: navigate • tab: focus hidden cols • d: details • s: status • c: comment • x: toggle col • +/-: resize • q: quit"))
 
 	return b.String()
 }
