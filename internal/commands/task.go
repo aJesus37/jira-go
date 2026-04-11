@@ -2,7 +2,9 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -96,6 +98,8 @@ func init() {
 	taskListCmd.Flags().Bool("active", false, "Show only active tasks (exclude status category 'Done')")
 	taskListCmd.Flags().Bool("backlog", false, "Show only backlog tasks (not in any sprint)")
 	taskListCmd.Flags().Int("limit", 50, "Maximum results (default 50 for interactive mode)")
+	taskListCmd.Flags().String("format", "table", "Output format: table or json")
+	taskListCmd.Flags().Bool("age", false, "Show days in current status column")
 
 	// Create flags
 	taskCreateCmd.Flags().String("project", "", "Project key (defaults to config)")
@@ -203,7 +207,9 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 	// Check if we should run in non-interactive mode
 	if noInteractiveFlag {
 		mergeAssigneeOwner := project.MergeAssigneeOwner == nil || *project.MergeAssigneeOwner
-		return displayTaskListTable(resp.Issues, resp.Total, mergeAssigneeOwner)
+		format, _ := cmd.Flags().GetString("format")
+		showAge, _ := cmd.Flags().GetBool("age")
+		return displayTaskListTable(resp.Issues, resp.Total, mergeAssigneeOwner, format, showAge)
 	}
 
 	// Run in interactive TUI mode
@@ -211,8 +217,20 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 	return tui.Run(model)
 }
 
-func displayTaskListTable(issues []models.Issue, total int, mergeAssigneeOwner bool) error {
-	fmt.Printf("%-12s %-10s %-12s %-20s %s\n", "KEY", "TYPE", "STATUS", "ASSIGNEE", "SUMMARY")
+func displayTaskListTable(issues []models.Issue, total int, mergeAssigneeOwner bool, format string, showAge bool) error {
+	// JSON output
+	if format == "json" {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(issues)
+	}
+
+	// Table header
+	if showAge {
+		fmt.Printf("%-12s %-10s %-12s %-6s %-20s %s\n", "KEY", "TYPE", "STATUS", "DAYS", "ASSIGNEE", "SUMMARY")
+	} else {
+		fmt.Printf("%-12s %-10s %-12s %-20s %s\n", "KEY", "TYPE", "STATUS", "ASSIGNEE", "SUMMARY")
+	}
 	fmt.Println(strings.Repeat("-", 100))
 
 	for _, issue := range issues {
@@ -244,7 +262,12 @@ func displayTaskListTable(issues []models.Issue, total int, mergeAssigneeOwner b
 			summary = summary[:37] + "..."
 		}
 
-		fmt.Printf("%-12s %-10s %-12s %-20s %s\n", issue.Key, issue.Type, status, displayAssignee, summary)
+		if showAge {
+			fmt.Printf("%-12s %-10s %-12s %-6d %-20s %s\n",
+				issue.Key, issue.Type, status, issue.DaysInStatus(), displayAssignee, summary)
+		} else {
+			fmt.Printf("%-12s %-10s %-12s %-20s %s\n", issue.Key, issue.Type, status, displayAssignee, summary)
+		}
 	}
 
 	fmt.Printf("\nShowing %d of %d issues\n", len(issues), total)

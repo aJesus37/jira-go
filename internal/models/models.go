@@ -172,6 +172,15 @@ func (r *RawIssue) ToIssue() Issue {
 	return issue
 }
 
+// DaysInStatus returns how many days the issue has been in its current status.
+// Uses Updated as a proxy since Jira changelog requires a separate API call.
+func (i Issue) DaysInStatus() int {
+	if i.Updated.IsZero() {
+		return 0
+	}
+	return int(time.Since(i.Updated).Hours() / 24)
+}
+
 func (i *Issue) GetAllParticipants() []User {
 	seen := make(map[string]bool)
 	var result []User
