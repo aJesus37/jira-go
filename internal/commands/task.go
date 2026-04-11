@@ -70,6 +70,13 @@ var taskStatusCmd = &cobra.Command{
 	RunE:  runTaskStatus,
 }
 
+var taskCommentCmd = &cobra.Command{
+	Use:   "comment [key] [message]",
+	Short: "Add a comment to an issue",
+	Args:  cobra.ExactArgs(2),
+	RunE:  runTaskComment,
+}
+
 func init() {
 	rootCmd.AddCommand(taskCmd)
 	taskCmd.AddCommand(taskListCmd)
@@ -78,6 +85,7 @@ func init() {
 	taskCmd.AddCommand(taskEditCmd)
 	taskCmd.AddCommand(taskDeleteCmd)
 	taskCmd.AddCommand(taskStatusCmd)
+	taskCmd.AddCommand(taskCommentCmd)
 	taskStatusCmd.Flags().String("comment", "", "Optional comment to add with the status change")
 
 	// List flags
@@ -513,5 +521,26 @@ func runTaskStatus(cmd *cobra.Command, args []string) error {
 		fmt.Printf("✓ Comment added\n")
 	}
 
+	return nil
+}
+
+func runTaskComment(cmd *cobra.Command, args []string) error {
+	key, message := args[0], args[1]
+
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	client, err := api.NewClient(cfg, cfg.DefaultProject)
+	if err != nil {
+		return fmt.Errorf("creating client: %w", err)
+	}
+
+	if err := client.AddComment(key, message); err != nil {
+		return fmt.Errorf("adding comment: %w", err)
+	}
+
+	fmt.Printf("✓ Comment added to %s\n", key)
 	return nil
 }
