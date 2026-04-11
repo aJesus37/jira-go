@@ -584,12 +584,18 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "q", "esc":
 		return m, tea.Quit
 	case "left", "h":
-		if m.activeColumn > 0 {
+		for m.activeColumn > 0 {
 			m.activeColumn--
+			if !m.columns[m.activeColumn].Hidden {
+				break
+			}
 		}
 	case "right", "l":
-		if m.activeColumn < len(m.columns)-1 {
+		for m.activeColumn < len(m.columns)-1 {
 			m.activeColumn++
+			if !m.columns[m.activeColumn].Hidden {
+				break
+			}
 		}
 	case "up", "k":
 		if len(m.columns) > 0 {
@@ -1096,8 +1102,13 @@ func (m KanbanBoardModel) kanbanView() string {
 	columnWidth := m.calculateColumnWidth()
 
 	// Render columns side by side
+	m.hiddenCount = 0
 	var columnViews []string
 	for i, col := range m.columns {
+		if col.Hidden {
+			m.hiddenCount++
+			continue
+		}
 		isActive := i == m.activeColumn
 		style := m.getColumnStyle(col.Name, isActive)
 		style = style.Width(columnWidth)
@@ -1133,6 +1144,12 @@ func (m KanbanBoardModel) kanbanView() string {
 	}
 
 	b.WriteString("\n\n")
+
+	if m.hiddenCount > 0 {
+		b.WriteString(fmt.Sprintf(" │ +%d hidden │ press x to toggle │", m.hiddenCount))
+		b.WriteString("\n\n")
+	}
+
 	b.WriteString(helpStyle.Render("←/→: switch columns • ↑/↓: navigate • d: details • s: status • c: comment • a: assignee • q: quit"))
 
 	return b.String()
