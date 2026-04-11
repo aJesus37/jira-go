@@ -1106,11 +1106,17 @@ func (m KanbanBoardModel) kanbanView() string {
 		// Hidden columns render separately below
 		if col.Hidden {
 			m.hiddenCount++
-			// Add indicator if active
+			// Add indicator if active, with padding
+			dimStyle := lipgloss.NewStyle().
+				Padding(0, 2).
+				Foreground(lipgloss.Color("#666666"))
+			activeStyle := lipgloss.NewStyle().
+				Padding(0, 2).
+				Foreground(lipgloss.Color("#7D56F4"))
 			if isActive {
-				hiddenColumns = append(hiddenColumns, lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Render("▸ "+col.Name))
+				hiddenColumns = append(hiddenColumns, activeStyle.Render("▸ "+col.Name))
 			} else {
-				hiddenColumns = append(hiddenColumns, lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(col.Name))
+				hiddenColumns = append(hiddenColumns, dimStyle.Render(col.Name))
 			}
 			continue
 		}
