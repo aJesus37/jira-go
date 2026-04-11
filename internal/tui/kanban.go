@@ -463,6 +463,10 @@ func (m *KanbanBoardModel) resizeColumn(idx int, delta int) {
 	if idx < 0 || idx >= len(m.columns) {
 		return
 	}
+	// Don't resize hidden columns
+	if m.columns[idx].Hidden {
+		return
+	}
 	m.columns[idx].Width += delta
 	if m.columns[idx].Width < 15 {
 		m.columns[idx].Width = 15
@@ -470,11 +474,12 @@ func (m *KanbanBoardModel) resizeColumn(idx int, delta int) {
 	if m.columns[idx].Width > 50 {
 		m.columns[idx].Width = 50
 	}
-	// Expanding a hidden column makes it visible
-	if delta > 0 && m.columns[idx].Hidden {
-		m.columns[idx].Hidden = false
-		m.hiddenCount--
+	// Update list size to reflect new width
+	width := m.columns[idx].Width
+	if width < 20 {
+		width = 20
 	}
+	m.columns[idx].List.SetSize(width-4, m.height-8)
 	m.saveColumnPrefs()
 }
 
@@ -490,18 +495,20 @@ func (m *KanbanBoardModel) saveColumnPrefs() {
 }
 
 func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Handle Tab key for cycling column focus
-	if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.Type == tea.KeyTab {
-		if m.hiddenCount > 0 {
-			m.focusHiddenColumns = !m.focusHiddenColumns
-			m.message = ""
-			if m.focusHiddenColumns {
-				m.message = "Hidden columns focused"
-			} else {
-				m.message = "Visible columns focused"
+	// Handle focus toggle key for cycling between visible and hidden columns
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		if keyMsg.String() == "f" || keyMsg.String() == "F" {
+			if m.hiddenCount > 0 {
+				m.focusHiddenColumns = !m.focusHiddenColumns
+				m.message = ""
+				if m.focusHiddenColumns {
+					m.message = "Hidden columns focused"
+				} else {
+					m.message = "Visible columns focused"
+				}
 			}
+			return m, nil
 		}
-		return m, nil
 	}
 
 	switch msg := msg.(type) {
@@ -1250,7 +1257,7 @@ func (m KanbanBoardModel) kanbanView() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(helpStyle.Render("←/→: switch cols • ↑/↓: navigate • tab: focus hidden cols • d: details • s: status • c: comment • x: toggle col • +/-: resize • q: quit"))
+	b.WriteString(helpStyle.Render("←/→: switch cols • ↑/↓: navigate • f: focus hidden cols • d: details • s: status • c: comment • x: toggle col • +/-: resize • q: quit"))
 
 	return b.String()
 }
