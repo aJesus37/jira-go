@@ -626,27 +626,6 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		// Handle f key for focus toggle at top level before mode switch
-		// Try both String() and Runes to ensure detection works
-		keyStr := msg.String()
-		isFKey := keyStr == "f" || keyStr == "F"
-		if !isFKey && len(msg.Runes) == 1 {
-			isFKey = msg.Runes[0] == 'f' || msg.Runes[0] == 'F'
-		}
-		if isFKey {
-			// Count hidden columns dynamically
-			hiddenCount := 0
-			for _, col := range m.columns {
-				if col.Hidden {
-					hiddenCount++
-				}
-			}
-			if hiddenCount > 0 {
-				m.focusHiddenColumns = !m.focusHiddenColumns
-			}
-			return m, nil
-		}
-
 		// Handle different modes
 		switch m.mode {
 		case ModeKanbanStatusChange:
