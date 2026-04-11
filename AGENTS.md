@@ -101,6 +101,61 @@ Jira natively only supports a single assignee. Multi-owner support is implemente
 3. Configure in `jira init`
 4. Use `--owners` flag with comma-separated emails
 
+### Assignee + Owner Merge
+
+By default, assignee and owner fields are merged and deduplicated in displays. Configure via:
+
+```yaml
+projects:
+  PROJ:
+    merge_assignee_owner: true  # default: true
+```
+
+## Sprint Board TUI
+
+Interactive kanban board for sprint management with rich features:
+
+### Launch
+```bash
+jira sprint board              # Interactive mode
+jira sprint board --no-interactive  # Static display
+```
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `←/→` or `h/l` | Navigate between columns |
+| `↑/↓` or `k/j` | Navigate tickets in column |
+| `x` | Toggle column visibility (hide/show) |
+| `+/-` | Resize column width |
+| `f` | Toggle focus between visible and hidden columns |
+| `[` / `]` | Move column left/right (reorder) |
+| `d` or `Enter` | View ticket details |
+| `s` | Change ticket status |
+| `c` | Add comment |
+| `q` or `Esc` | Quit |
+
+### Column Preferences
+
+Column visibility, width, and order are persisted per project:
+
+**Storage:** `~/.config/jira-go/board-columns.json`
+
+```json
+{
+  "PROJ": {
+    "To Do": { "visible": true, "width": 30, "order": 0 },
+    "In Progress": { "visible": true, "width": 35, "order": 1 },
+    "Done": { "visible": false, "width": 25, "order": 2 }
+  }
+}
+```
+
+- **Hidden columns** appear as labels below visible columns
+- Press `f` to focus hidden columns, then `←/→` to navigate them
+- Press `x` on a hidden column to make it visible
+
 ## Testing
 
 ### Running Tests

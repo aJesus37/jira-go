@@ -141,6 +141,35 @@ jira ceremony retro
 jira ceremony daily
 ```
 
+### Sprint Board
+
+Interactive kanban board with rich TUI features:
+
+```bash
+# Launch interactive sprint board
+jira sprint board
+
+# Static display (no interaction)
+jira sprint board --no-interactive
+```
+
+**Keyboard Shortcuts:**
+
+| Key | Action |
+|-----|--------|
+| `←/→` or `h/l` | Navigate between columns |
+| `↑/↓` or `k/j` | Navigate tickets in column |
+| `x` | Toggle column visibility (hide/show) |
+| `+/-` | Resize column width |
+| `f` | Toggle focus between visible and hidden columns |
+| `[` / `]` | Move column left/right (reorder) |
+| `d` or `Enter` | View ticket details |
+| `s` | Change ticket status |
+| `c` | Add comment |
+| `q` or `Esc` | Quit |
+
+Column preferences (visibility, width, order) are persisted to `~/.config/jira-go/board-columns.json`.
+
 ## Configuration
 
 Configuration is stored in `~/.config/jira-go/config.yaml`:
@@ -156,6 +185,8 @@ projects:
     jira_url: https://company.atlassian.net
     board_id: 1
     multi_owner_field: customfield_10001
+    sprint_field: customfield_10002      # For sprint board support
+    merge_assignee_owner: true          # Merge assignee + owners (default: true)
 
 cache:
   enabled: true

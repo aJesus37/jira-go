@@ -18,11 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sprint planning and retrospective ceremonies
 - SQLite caching with TTL support
 - Configuration via YAML and environment variables
+- Sprint board column visibility toggle with `x` key
+- Sprint board column resizing with `+/-` keys
+- Sprint board column reordering with `[`/`]` keys
+- Sprint board focus cycling between visible/hidden columns with `f` key
+- Configurable assignee+owner merging via `merge_assignee_owner` setting
 
 ### Features
 - List, view, create, edit, delete Jira issues
 - Assign multiple owners to issues via custom fields
-- View sprint boards in kanban view
+- View sprint boards in interactive kanban view with column management
+- Toggle, resize, and reorder sprint board columns
 - Interactive task detail view with markdown rendering
 - Cache management commands
 - Project switching and configuration
