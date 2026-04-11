@@ -691,11 +691,25 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Ensure activeColumn is always valid for current focus mode
-	// This fixes issues after toggling focus or when state gets inconsistent
-	if m.focusHiddenColumns {
-		// Should be on a hidden column
-		if m.activeColumn >= len(m.columns) || !m.columns[m.activeColumn].Hidden {
+	// Handle 'f' key for focus toggle (check before switch to ensure it works)
+	keyStr := msg.String()
+	if keyStr == "f" || keyStr == "F" {
+		// Count hidden columns
+		hiddenCount := 0
+		for _, col := range m.columns {
+			if col.Hidden {
+				hiddenCount++
+			}
+		}
+		if hiddenCount == 0 {
+			return m, nil
+		}
+
+		// Toggle focus mode
+		m.focusHiddenColumns = !m.focusHiddenColumns
+
+		// Set active column based on new mode
+		if m.focusHiddenColumns {
 			// Find first hidden column
 			for i, col := range m.columns {
 				if col.Hidden {
@@ -703,50 +717,12 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 					break
 				}
 			}
-		}
-	} else {
-		// Should be on a visible column
-		if m.activeColumn >= len(m.columns) || m.columns[m.activeColumn].Hidden {
+		} else {
 			// Find first visible column
 			for i, col := range m.columns {
 				if !col.Hidden {
 					m.activeColumn = i
 					break
-				}
-			}
-		}
-	}
-
-	// Handle 'f' key for focus toggle (check before switch to ensure it works)
-	keyStr := msg.String()
-	if keyStr == "f" || keyStr == "F" {
-		// Count hidden columns dynamically
-		hiddenCount := 0
-		for _, col := range m.columns {
-			if col.Hidden {
-				hiddenCount++
-			}
-		}
-		if hiddenCount > 0 {
-			// Toggle focus mode
-			m.focusHiddenColumns = !m.focusHiddenColumns
-
-			// After toggle, ensure we have a valid column selected
-			if m.focusHiddenColumns {
-				// Find first hidden column
-				for i, col := range m.columns {
-					if col.Hidden {
-						m.activeColumn = i
-						break
-					}
-				}
-			} else {
-				// Find first visible column
-				for i, col := range m.columns {
-					if !col.Hidden {
-						m.activeColumn = i
-						break
-					}
 				}
 			}
 		}
