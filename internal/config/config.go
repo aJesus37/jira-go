@@ -29,11 +29,12 @@ type AuthConfig struct {
 
 // Project holds project-specific configuration
 type Project struct {
-	JiraURL         string            `yaml:"jira_url"`
-	BoardID         int               `yaml:"board_id"`
-	MultiOwnerField string            `yaml:"multi_owner_field"`
-	SprintField     string            `yaml:"sprint_field"`
-	IssueTypes      map[string]string `yaml:"issue_types"`
+	JiraURL            string            `yaml:"jira_url"`
+	BoardID            int               `yaml:"board_id"`
+	MultiOwnerField    string            `yaml:"multi_owner_field"`
+	SprintField        string            `yaml:"sprint_field"`
+	IssueTypes         map[string]string `yaml:"issue_types"`
+	MergeAssigneeOwner *bool             `yaml:"merge_assignee_owner"`
 }
 
 // CacheConfig holds caching configuration

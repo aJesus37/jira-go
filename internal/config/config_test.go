@@ -43,3 +43,10 @@ projects:
 		t.Errorf("Auth.Email = %v, want test@example.com", cfg.Auth.Email)
 	}
 }
+
+func TestProjectMergeAssigneeOwnerDefault(t *testing.T) {
+	proj := Project{}
+	if proj.MergeAssigneeOwner != nil && *proj.MergeAssigneeOwner != true {
+		t.Errorf("expected nil (default true), got %v", proj.MergeAssigneeOwner)
+	}
+}
