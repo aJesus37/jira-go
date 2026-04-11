@@ -205,10 +205,10 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if we should run in non-interactive mode
-	if noInteractiveFlag {
+	format, _ := cmd.Flags().GetString("format")
+	showAge, _ := cmd.Flags().GetBool("age")
+	if noInteractiveFlag || format != "table" || showAge {
 		mergeAssigneeOwner := project.MergeAssigneeOwner == nil || *project.MergeAssigneeOwner
-		format, _ := cmd.Flags().GetString("format")
-		showAge, _ := cmd.Flags().GetBool("age")
 		return displayTaskListTable(resp.Issues, resp.Total, mergeAssigneeOwner, format, showAge)
 	}
 
@@ -218,6 +218,10 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 }
 
 func displayTaskListTable(issues []models.Issue, total int, mergeAssigneeOwner bool, format string, showAge bool) error {
+	if format != "table" && format != "json" {
+		return fmt.Errorf("unknown format %q: must be table or json", format)
+	}
+
 	// JSON output
 	if format == "json" {
 		enc := json.NewEncoder(os.Stdout)
