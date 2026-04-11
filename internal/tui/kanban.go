@@ -447,6 +447,40 @@ func (m KanbanBoardModel) loadIssueDetails(key string) tea.Cmd {
 	}
 }
 
+func (m *KanbanBoardModel) toggleColumnVisibility(idx int) {
+	if idx < 0 || idx >= len(m.columns) {
+		return
+	}
+	col := &m.columns[idx]
+	col.Hidden = !col.Hidden
+	m.saveColumnPrefs()
+}
+
+func (m *KanbanBoardModel) resizeColumn(idx int, delta int) {
+	if idx < 0 || idx >= len(m.columns) {
+		return
+	}
+	m.columns[idx].Width += delta
+	if m.columns[idx].Width < 15 {
+		m.columns[idx].Width = 15
+	}
+	if m.columns[idx].Width > 50 {
+		m.columns[idx].Width = 50
+	}
+	m.saveColumnPrefs()
+}
+
+func (m *KanbanBoardModel) saveColumnPrefs() {
+	prefs := make(config.BoardColumnPrefs)
+	for _, col := range m.columns {
+		prefs[col.Name] = config.ColumnConfig{
+			Visible: !col.Hidden,
+			Width:   col.Width,
+		}
+	}
+	config.SaveBoardColumns(m.projectKey, prefs)
+}
+
 func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case kanbanTransitionsLoadedMsg:
@@ -603,6 +637,15 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			m.message = ""
 			return m, m.loadIssueDetails(item.issue.Key)
 		}
+	case "x":
+		// Toggle current column visibility
+		m.toggleColumnVisibility(m.activeColumn)
+	case "+", "=":
+		// Increase column width
+		m.resizeColumn(m.activeColumn, 5)
+	case "-":
+		// Decrease column width
+		m.resizeColumn(m.activeColumn, -5)
 	}
 
 	return m, nil
