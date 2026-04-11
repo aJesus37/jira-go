@@ -1097,16 +1097,21 @@ func (m KanbanBoardModel) kanbanView() string {
 
 	// Render columns side by side
 	m.hiddenCount = 0
-	var columnViews []string
+	var visibleColumns []string
+	var hiddenColumns []string
 	for i, col := range m.columns {
 		isActive := i == m.activeColumn
 		style := m.getColumnStyle(col.Name, isActive)
 
-		// Hidden columns render as narrow collapsed view
+		// Hidden columns render separately below
 		if col.Hidden {
 			m.hiddenCount++
-			// Render as simple text label, no border
-			columnViews = append(columnViews, col.Name)
+			// Add indicator if active
+			if isActive {
+				hiddenColumns = append(hiddenColumns, lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Render("▸ "+col.Name))
+			} else {
+				hiddenColumns = append(hiddenColumns, lipgloss.NewStyle().Foreground(lipgloss.Color("#666666")).Render(col.Name))
+			}
 			continue
 		}
 
@@ -1133,13 +1138,20 @@ func (m KanbanBoardModel) kanbanView() string {
 		col.List.SetDelegate(delegate)
 
 		colView := style.Render(col.List.View())
-		columnViews = append(columnViews, colView)
+		visibleColumns = append(visibleColumns, colView)
 	}
 
-	// Join columns horizontally
-	if len(columnViews) > 0 {
-		row := lipgloss.JoinHorizontal(lipgloss.Top, columnViews...)
+	// Join visible columns horizontally
+	if len(visibleColumns) > 0 {
+		row := lipgloss.JoinHorizontal(lipgloss.Top, visibleColumns...)
 		b.WriteString(row)
+	}
+
+	// Render hidden columns in a separate row below
+	if len(hiddenColumns) > 0 {
+		b.WriteString("\n")
+		hiddenRow := lipgloss.JoinHorizontal(lipgloss.Top, hiddenColumns...)
+		b.WriteString(hiddenRow)
 	}
 
 	b.WriteString("\n\n")
