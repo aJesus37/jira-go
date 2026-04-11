@@ -587,7 +587,14 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			isFKey = msg.Runes[0] == 'f' || msg.Runes[0] == 'F'
 		}
 		if isFKey {
-			if m.hiddenCount > 0 {
+			// Count hidden columns dynamically
+			hiddenCount := 0
+			for _, col := range m.columns {
+				if col.Hidden {
+					hiddenCount++
+				}
+			}
+			if hiddenCount > 0 {
 				m.focusHiddenColumns = !m.focusHiddenColumns
 				m.message = ""
 				if m.focusHiddenColumns {
