@@ -333,7 +333,12 @@ func runTaskCreate(cmd *cobra.Command, args []string) error {
 			}
 		}
 		if transitionID == "" {
-			return fmt.Errorf("status %q not available after creation", targetStatus)
+			var names []string
+			for _, t := range transitions {
+				names = append(names, t.Name)
+			}
+			return fmt.Errorf("status %q not available after creation; available: %s",
+				targetStatus, strings.Join(names, ", "))
 		}
 		if err := client.TransitionIssue(issue.Key, transitionID); err != nil {
 			return fmt.Errorf("setting initial status: %w", err)
