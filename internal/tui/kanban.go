@@ -19,62 +19,62 @@ var (
 	columnStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#555555")).
-			Padding(1)
+			Padding(0, 1)
 
 	activeColumnStyle = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("#7D56F4")).
-				Padding(1)
+				Padding(0, 1)
 
 	todoColumnStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#808080")).
-			Padding(1)
+			Padding(0, 1)
 
 	todoActiveColumnStyle = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("#7D56F4")).
-				Padding(1)
+				Padding(0, 1)
 
 	inProgressColumnStyle = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("#00A8E8")).
-				Padding(1)
+				Padding(0, 1)
 
 	inProgressActiveColumnStyle = lipgloss.NewStyle().
 					Border(lipgloss.RoundedBorder()).
 					BorderForeground(lipgloss.Color("#7D56F4")).
-					Padding(1)
+					Padding(0, 1)
 
 	doneColumnStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#00C851")).
-			Padding(1)
+			Padding(0, 1)
 
 	doneActiveColumnStyle = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("#7D56F4")).
-				Padding(1)
+				Padding(0, 1)
 
 	blockedColumnStyle = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("#FF4444")).
-				Padding(1)
+				Padding(0, 1)
 
 	blockedActiveColumnStyle = lipgloss.NewStyle().
 					Border(lipgloss.RoundedBorder()).
 					BorderForeground(lipgloss.Color("#7D56F4")).
-					Padding(1)
+					Padding(0, 1)
 
 	reviewColumnStyle = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("#FFA500")).
-				Padding(1)
+				Padding(0, 1)
 
 	reviewActiveColumnStyle = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("#7D56F4")).
-				Padding(1)
+				Padding(0, 1)
 
 	popupStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -300,7 +300,7 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 
 		// Apply saved width to list size if set (use shorter height to fit screen)
 		if width > 0 {
-			l.SetSize(width, 15)
+			l.SetSize(width, 12)
 		}
 	}
 
@@ -608,10 +608,14 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update column widths - use custom width if set, otherwise calculate
 		if len(m.columns) > 0 {
 			columnWidth := m.calculateColumnWidth()
-			// Cap list height to fit in terminal (leave room for header, hidden cols, help)
-			listHeight := m.height - 12
-			if listHeight < 10 {
-				listHeight = 10
+			// Cap list height to fit in terminal (leave room for header, message, hidden cols, help)
+			// Header ~3 lines, message ~2 lines, hidden cols row ~2 lines, help ~1 line = ~8 lines
+			listHeight := m.height - 10
+			if listHeight < 8 {
+				listHeight = 8
+			}
+			if listHeight > 20 {
+				listHeight = 20
 			}
 			for i := range m.columns {
 				width := columnWidth
@@ -741,8 +745,8 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "-":
 		// Decrease column width
 		m.resizeColumn(m.activeColumn, -5)
-	case "\t":
-		// Tab - toggle focus between visible and hidden columns
+	case "f", "F":
+		// Toggle focus between visible and hidden columns
 		if m.hiddenCount > 0 {
 			m.focusHiddenColumns = !m.focusHiddenColumns
 			m.message = ""
