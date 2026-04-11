@@ -271,6 +271,11 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 		// Force 2 lines per item (title + description)
 		delegate.SetHeight(2)
 		delegate.SetSpacing(0)
+		// Set max width to prevent wrapping and ensure proper truncation
+		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(35)
+		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(35)
+		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(35)
+		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(35)
 		l := list.New(items, delegate, 35, 18)
 		l.Title = fmt.Sprintf("%s (%d)", status, len(statusIssues))
 		l.SetShowStatusBar(false)
@@ -1261,6 +1266,18 @@ func (m KanbanBoardModel) kanbanView() string {
 		// Force 2 lines per item (title + description)
 		delegate.SetHeight(2)
 		delegate.SetSpacing(0)
+		// Set max width to prevent wrapping and ensure proper truncation
+		itemWidth := columnWidth - 4
+		if col.Width > 0 {
+			itemWidth = col.Width - 4
+		}
+		if itemWidth < 20 {
+			itemWidth = 20
+		}
+		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(itemWidth)
+		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(itemWidth)
+		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(itemWidth)
+		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(itemWidth)
 		if isActive && !m.focusHiddenColumns {
 			// Use purple for selected items in active column (only when not focusing hidden columns)
 			delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("#7D56F4"))
