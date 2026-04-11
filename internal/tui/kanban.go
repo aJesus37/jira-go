@@ -1105,12 +1105,8 @@ func (m KanbanBoardModel) kanbanView() string {
 		// Hidden columns render as narrow collapsed view
 		if col.Hidden {
 			m.hiddenCount++
-			style = style.Width(2)
-			// Render collapsed column with vertical name
-			collapsedContent := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#666666")).
-				Render("⋮\n" + col.Name + "\n⋮")
-			columnViews = append(columnViews, style.Render(collapsedContent))
+			// Render as simple text label, no border
+			columnViews = append(columnViews, col.Name)
 			continue
 		}
 
