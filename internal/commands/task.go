@@ -104,6 +104,7 @@ func init() {
 	taskCreateCmd.Flags().String("description", "", "Issue description")
 	taskCreateCmd.Flags().String("assignee", "", "Assignee email")
 	taskCreateCmd.Flags().String("owners", "", "Comma-separated owner emails")
+	taskCreateCmd.Flags().String("status", "", "Set initial status after creation (e.g. 'Done')")
 
 	// Edit flags
 	taskEditCmd.Flags().String("summary", "", "New summary")
@@ -317,6 +318,27 @@ func runTaskCreate(cmd *cobra.Command, args []string) error {
 		}
 
 		fmt.Printf("✓ Set owners: %s\n", ownersStr)
+	}
+
+	if targetStatus, _ := cmd.Flags().GetString("status"); targetStatus != "" {
+		transitions, err := client.GetTransitions(issue.Key)
+		if err != nil {
+			return fmt.Errorf("getting transitions: %w", err)
+		}
+		var transitionID string
+		for _, t := range transitions {
+			if strings.EqualFold(t.Name, targetStatus) {
+				transitionID = t.ID
+				break
+			}
+		}
+		if transitionID == "" {
+			return fmt.Errorf("status %q not available after creation", targetStatus)
+		}
+		if err := client.TransitionIssue(issue.Key, transitionID); err != nil {
+			return fmt.Errorf("setting initial status: %w", err)
+		}
+		fmt.Printf("✓ Status set to %s\n", targetStatus)
 	}
 
 	return nil
