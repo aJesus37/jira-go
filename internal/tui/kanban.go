@@ -580,8 +580,13 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		// Handle f key for focus toggle at top level before mode switch
+		// Try both String() and Runes to ensure detection works
 		keyStr := msg.String()
-		if keyStr == "f" || keyStr == "F" {
+		isFKey := keyStr == "f" || keyStr == "F"
+		if !isFKey && len(msg.Runes) == 1 {
+			isFKey = msg.Runes[0] == 'f' || msg.Runes[0] == 'F'
+		}
+		if isFKey {
 			if m.hiddenCount > 0 {
 				m.focusHiddenColumns = !m.focusHiddenColumns
 				m.message = ""
@@ -590,6 +595,8 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.message = "Visible columns focused"
 				}
+			} else {
+				m.message = "No hidden columns to focus"
 			}
 			return m, nil
 		}
