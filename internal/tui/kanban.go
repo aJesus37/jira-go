@@ -694,24 +694,55 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	// Handle 'f' key for focus toggle (check before switch to ensure it works)
 	keyStr := msg.String()
 	if keyStr == "f" || keyStr == "F" {
-		if m.hiddenCount > 0 {
+		// Count hidden columns dynamically
+		hiddenCount := 0
+		for _, col := range m.columns {
+			if col.Hidden {
+				hiddenCount++
+			}
+		}
+		if hiddenCount > 0 {
 			m.focusHiddenColumns = !m.focusHiddenColumns
 			m.message = ""
-			// Set activeColumn to first appropriate column in new mode
+			// Find the closest appropriate column from current position
 			if m.focusHiddenColumns {
-				// Find first hidden column
-				for i, col := range m.columns {
-					if col.Hidden {
+				// Looking for hidden column - search from current position first
+				found := false
+				// Search forward from current position
+				for i := m.activeColumn; i < len(m.columns); i++ {
+					if m.columns[i].Hidden {
 						m.activeColumn = i
+						found = true
 						break
 					}
 				}
+				// If not found, search from beginning
+				if !found {
+					for i := 0; i < m.activeColumn; i++ {
+						if m.columns[i].Hidden {
+							m.activeColumn = i
+							break
+						}
+					}
+				}
 			} else {
-				// Find first visible column
-				for i, col := range m.columns {
-					if !col.Hidden {
+				// Looking for visible column - search from current position first
+				found := false
+				// Search forward from current position
+				for i := m.activeColumn; i < len(m.columns); i++ {
+					if !m.columns[i].Hidden {
 						m.activeColumn = i
+						found = true
 						break
+					}
+				}
+				// If not found, search from beginning
+				if !found {
+					for i := 0; i < m.activeColumn; i++ {
+						if !m.columns[i].Hidden {
+							m.activeColumn = i
+							break
+						}
 					}
 				}
 			}
