@@ -270,7 +270,7 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 		delegate := list.NewDefaultDelegate()
 		// Force 2 lines per item (title + description)
 		delegate.SetHeight(2)
-		delegate.SetSpacing(0)
+		delegate.SetSpacing(1)
 		// Set max width to prevent wrapping and ensure proper truncation
 		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(35)
 		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(35)
@@ -1260,7 +1260,7 @@ func (m KanbanBoardModel) kanbanView() string {
 		delegate := list.NewDefaultDelegate()
 		// Force 2 lines per item (title + description)
 		delegate.SetHeight(2)
-		delegate.SetSpacing(0)
+		delegate.SetSpacing(1)
 		// Set max width to prevent wrapping and ensure proper truncation
 		itemWidth := columnWidth - 4
 		if col.Width > 0 {
