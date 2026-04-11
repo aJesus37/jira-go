@@ -322,7 +322,10 @@ func runSprintBoard(cmd *cobra.Command, args []string) error {
 	}
 
 	projectKey := getProjectKey(cmd, cfg)
-	project, _ := cfg.GetProject(projectKey)
+	project, err := cfg.GetProject(projectKey)
+	if err != nil {
+		return fmt.Errorf("getting project %s: %w", projectKey, err)
+	}
 
 	client, err := api.NewClient(cfg, projectKey)
 	if err != nil {
@@ -380,7 +383,7 @@ func runSprintBoard(cmd *cobra.Command, args []string) error {
 	}
 
 	// Launch kanban TUI
-	model := tui.NewKanbanBoard(issues, sprintID, client)
+	model := tui.NewKanbanBoard(issues, sprintID, client, projectKey)
 	return tui.Run(model)
 }
 

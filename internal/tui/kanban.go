@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/user/jira-go/internal/api"
+	"github.com/user/jira-go/internal/config"
 	"github.com/user/jira-go/internal/models"
 )
 
@@ -111,6 +112,8 @@ type KanbanColumn struct {
 	Name   string
 	Issues []KanbanIssue
 	List   list.Model
+	Hidden bool
+	Width  int
 }
 
 // KanbanBoardModel is the TUI model for kanban board
@@ -121,6 +124,11 @@ type KanbanBoardModel struct {
 	sprintID     int
 	width        int
 	height       int
+
+	columnPrefs         config.BoardColumnPrefs
+	projectKey          string
+	hiddenCount         int
+	columnWidthOverride int
 
 	// Action mode
 	mode          KanbanMode
@@ -184,7 +192,10 @@ func generateMockTasks() []KanbanIssue {
 }
 
 // NewKanbanBoard creates a new kanban board TUI
-func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client) KanbanBoardModel {
+func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, projectKey string) KanbanBoardModel {
+	// Load column preferences
+	prefs, _ := config.LoadBoardColumns(projectKey)
+
 	// If no real issues, use mock data
 	var kanbanIssues []KanbanIssue
 	if len(issues) == 0 {
@@ -259,10 +270,23 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client) Kan
 		l.SetFilteringEnabled(false)
 		l.SetShowHelp(false)
 
+		hidden := false
+		width := 0
+		if colConfig, ok := prefs[status]; ok {
+			if !colConfig.Visible {
+				hidden = true
+			}
+			if colConfig.Width > 0 {
+				width = colConfig.Width
+			}
+		}
+
 		columns = append(columns, KanbanColumn{
 			Name:   status,
 			Issues: statusIssues,
 			List:   l,
+			Hidden: hidden,
+			Width:  width,
 		})
 	}
 
@@ -285,14 +309,17 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client) Kan
 	commentInput.BlurredStyle.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
 
 	return KanbanBoardModel{
-		columns:         columns,
-		activeColumn:    0,
-		client:          client,
-		sprintID:        sprintID,
-		mode:            ModeKanbanNormal,
-		commentInput:    commentInput,
-		transitionIndex: 0,
-		sprintIndex:     0,
+		columns:             columns,
+		activeColumn:        0,
+		client:              client,
+		sprintID:            sprintID,
+		mode:                ModeKanbanNormal,
+		commentInput:        commentInput,
+		transitionIndex:     0,
+		sprintIndex:         0,
+		columnPrefs:         prefs,
+		projectKey:          projectKey,
+		columnWidthOverride: 0,
 	}
 }
 
