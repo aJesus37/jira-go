@@ -253,38 +253,16 @@ func (c *Client) UpdateSprint(sprintID int, name, goal string, startDate, endDat
 	return &sprint, nil
 }
 
-// GetSprintIssues retrieves issues in a sprint
+// GetSprintIssues retrieves issues in a sprint using JQL search
 func (c *Client) GetSprintIssues(sprintID int, ownerFieldID string, sprintFieldID string) ([]models.Issue, error) {
-	fields := "summary,status,assignee,created,updated,issuetype,description,labels"
-	if ownerFieldID != "" {
-		fields = fields + "," + ownerFieldID
-	}
+	jql := fmt.Sprintf("sprint = %d", sprintID)
 
-	endpoint := fmt.Sprintf("/rest/agile/1.0/sprint/%d/issue?fields=%s", sprintID, fields)
-
-	resp, err := c.Get(endpoint)
+	result, err := c.SearchIssues(jql, 0, 100, ownerFieldID, sprintFieldID)
 	if err != nil {
-		return nil, fmt.Errorf("fetching sprint issues: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("get sprint issues failed: %s", resp.Status)
+		return nil, fmt.Errorf("searching sprint issues: %w", err)
 	}
 
-	var result IssueSearchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
-	}
-
-	// Convert RawIssues to Issues with owners and sprint
-	var issues []models.Issue
-	for _, raw := range result.RawIssues {
-		issue := raw.ToIssueWithOwners(ownerFieldID, sprintFieldID)
-		issues = append(issues, issue)
-	}
-
-	return issues, nil
+	return result.Issues, nil
 }
 
 // MoveIssuesToSprint moves issues to a sprint
