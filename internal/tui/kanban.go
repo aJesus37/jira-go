@@ -267,7 +267,13 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 			items = append(items, KanbanIssueItem{issue: issue})
 		}
 
-		l := list.New(items, list.NewDefaultDelegate(), 28, 18)
+		delegate := list.NewDefaultDelegate()
+		// Allow longer titles by not truncating
+		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(0)
+		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(0)
+		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(0)
+		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(0)
+		l := list.New(items, delegate, 28, 18)
 		l.Title = fmt.Sprintf("%s (%d)", status, len(statusIssues))
 		l.SetShowStatusBar(false)
 		l.SetFilteringEnabled(false)
@@ -566,7 +572,7 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		// Handle f key for focus toggle at top level before mode switch
-		if msg.String() == "f" || msg.String() == "F" {
+		if len(msg.Runes) == 1 && (msg.Runes[0] == 'f' || msg.Runes[0] == 'F') {
 			if m.hiddenCount > 0 {
 				m.focusHiddenColumns = !m.focusHiddenColumns
 				m.message = ""
@@ -1235,6 +1241,11 @@ func (m KanbanBoardModel) kanbanView() string {
 
 		// Configure list delegate based on active state
 		delegate := list.NewDefaultDelegate()
+		// Don't truncate content
+		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(0)
+		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(0)
+		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(0)
+		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(0)
 		if isActive {
 			// Use purple for selected items in active column
 			delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("#7D56F4"))
