@@ -155,9 +155,6 @@ type KanbanBoardModel struct {
 
 	// Column visibility focus
 	focusHiddenColumns bool
-
-	// Main board viewport for scrolling when content exceeds screen
-	boardVP viewport.Model
 }
 
 // generateMockTasks creates realistic mock tasks for demonstration
@@ -325,10 +322,6 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 	commentInput.BlurredStyle.Text = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF"))
 	commentInput.BlurredStyle.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
 
-	// Initialize board viewport (will be resized on first WindowSizeMsg)
-	boardVP := viewport.New(80, 24)
-	boardVP.SetContent("")
-
 	return KanbanBoardModel{
 		columns:             columns,
 		activeColumn:        0,
@@ -341,7 +334,6 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 		columnPrefs:         prefs,
 		projectKey:          projectKey,
 		columnWidthOverride: 0,
-		boardVP:             boardVP,
 	}
 }
 
@@ -624,10 +616,6 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.columns[i].List.SetSize(width, m.height-8)
 			}
 		}
-
-		// Resize board viewport to fit terminal
-		m.boardVP.Width = msg.Width
-		m.boardVP.Height = msg.Height
 	}
 
 	return m, nil
@@ -759,14 +747,6 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 				m.message = "Visible columns focused"
 			}
 		}
-	case "pgup":
-		m.boardVP.LineUp(10)
-	case "pgdown":
-		m.boardVP.LineDown(10)
-	case "home", "g":
-		m.boardVP.GotoTop()
-	case "end", "G":
-		m.boardVP.GotoBottom()
 	}
 
 	return m, nil
@@ -1084,10 +1064,9 @@ func (m KanbanBoardModel) View() string {
 	// Always render the kanban board as background
 	background := m.kanbanView()
 
-	// If in normal mode, use viewport for scrolling
+	// If in normal mode, just return the background
 	if m.mode == ModeKanbanNormal {
-		m.boardVP.SetContent(background)
-		return m.boardVP.View()
+		return background
 	}
 
 	// For popup modes, render popup centered over the board
@@ -1296,7 +1275,7 @@ func (m KanbanBoardModel) kanbanView() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(helpStyle.Render("←/→: switch cols • ↑/↓: navigate • g/G: top/bottom • pgup/pgdn: scroll • f: focus hidden cols • d: details • s: status • c: comment • x: toggle col • +/-: resize • q: quit"))
+	b.WriteString(helpStyle.Render("←/→: switch cols • ↑/↓: navigate • f: focus hidden cols • d: details • s: status • c: comment • x: toggle col • +/-: resize • q: quit"))
 
 	return b.String()
 }
