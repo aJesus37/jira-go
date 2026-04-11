@@ -697,10 +697,23 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		if m.hiddenCount > 0 {
 			m.focusHiddenColumns = !m.focusHiddenColumns
 			m.message = ""
+			// Set activeColumn to first appropriate column in new mode
 			if m.focusHiddenColumns {
-				m.message = "Hidden columns focused"
+				// Find first hidden column
+				for i, col := range m.columns {
+					if col.Hidden {
+						m.activeColumn = i
+						break
+					}
+				}
 			} else {
-				m.message = "Visible columns focused"
+				// Find first visible column
+				for i, col := range m.columns {
+					if !col.Hidden {
+						m.activeColumn = i
+						break
+					}
+				}
 			}
 		}
 		return m, nil
