@@ -96,7 +96,6 @@ const (
 	ModeKanbanAssigneeChange
 	ModeKanbanSprintAssign
 	ModeKanbanTaskDetail
-	ModeKanbanColumnSelect
 )
 
 // KanbanIssue represents an issue in kanban view
@@ -153,9 +152,6 @@ type KanbanBoardModel struct {
 	detailIssue  *models.Issue
 	detailVP     viewport.Model
 	detailOffset int
-
-	// Column select mode
-	columnSelectIndex int
 }
 
 // generateMockTasks creates realistic mock tasks for demonstration
@@ -563,8 +559,6 @@ func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleSprintAssignKeys(msg)
 		case ModeKanbanTaskDetail:
 			return m.handleTaskDetailKeys(msg)
-		case ModeKanbanColumnSelect:
-			return m.handleColumnSelectKeys(msg)
 		case ModeKanbanNormal:
 			return m.handleNormalKeys(msg)
 		}
@@ -590,18 +584,12 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "q", "esc":
 		return m, tea.Quit
 	case "left", "h":
-		for m.activeColumn > 0 {
+		if m.activeColumn > 0 {
 			m.activeColumn--
-			if !m.columns[m.activeColumn].Hidden {
-				break
-			}
 		}
 	case "right", "l":
-		for m.activeColumn < len(m.columns)-1 {
+		if m.activeColumn < len(m.columns)-1 {
 			m.activeColumn++
-			if !m.columns[m.activeColumn].Hidden {
-				break
-			}
 		}
 	case "up", "k":
 		if len(m.columns) > 0 {
@@ -658,19 +646,6 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "-":
 		// Decrease column width
 		m.resizeColumn(m.activeColumn, -5)
-	case "z":
-		// Show hidden columns picker
-		if m.hiddenCount > 0 {
-			m.mode = ModeKanbanColumnSelect
-			m.message = ""
-			// Find first hidden column to start selection
-			for i := range m.columns {
-				if m.columns[i].Hidden {
-					m.columnSelectIndex = i
-					break
-				}
-			}
-		}
 	}
 
 	return m, nil
@@ -781,85 +756,6 @@ func (m KanbanBoardModel) handleTaskDetailKeys(msg tea.KeyMsg) (tea.Model, tea.C
 		m.detailVP.GotoBottom()
 		return m, nil
 	}
-	return m, nil
-}
-
-func (m KanbanBoardModel) handleColumnSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "q", "esc":
-		m.mode = ModeKanbanNormal
-		return m, nil
-	case "up", "k":
-		// Find previous hidden column
-		if m.columnSelectIndex > 0 {
-			for i := m.columnSelectIndex - 1; i >= 0; i-- {
-				if m.columns[i].Hidden {
-					m.columnSelectIndex = i
-					return m, nil
-				}
-			}
-		}
-		// Wrap around - find last hidden
-		for i := len(m.columns) - 1; i > m.columnSelectIndex; i-- {
-			if m.columns[i].Hidden {
-				m.columnSelectIndex = i
-				return m, nil
-			}
-		}
-	case "down", "j":
-		// Find next hidden column
-		for i := m.columnSelectIndex + 1; i < len(m.columns); i++ {
-			if m.columns[i].Hidden {
-				m.columnSelectIndex = i
-				return m, nil
-			}
-		}
-		// Wrap around - find first hidden
-		for i := 0; i < m.columnSelectIndex; i++ {
-			if m.columns[i].Hidden {
-				m.columnSelectIndex = i
-				return m, nil
-			}
-		}
-	case "enter":
-		// Show selected hidden column (toggle visibility)
-		if m.columnSelectIndex >= 0 && m.columnSelectIndex < len(m.columns) {
-			m.columns[m.columnSelectIndex].Hidden = false
-			m.hiddenCount--
-			m.saveColumnPrefs()
-		}
-		m.mode = ModeKanbanNormal
-		return m, nil
-	case "left", "h":
-		// Same as up
-		for i := m.columnSelectIndex - 1; i >= 0; i-- {
-			if m.columns[i].Hidden {
-				m.columnSelectIndex = i
-				return m, nil
-			}
-		}
-		for i := len(m.columns) - 1; i > m.columnSelectIndex; i-- {
-			if m.columns[i].Hidden {
-				m.columnSelectIndex = i
-				return m, nil
-			}
-		}
-	case "right", "l":
-		// Same as down
-		for i := m.columnSelectIndex + 1; i < len(m.columns); i++ {
-			if m.columns[i].Hidden {
-				m.columnSelectIndex = i
-				return m, nil
-			}
-		}
-		for i := 0; i < m.columnSelectIndex; i++ {
-			if m.columns[i].Hidden {
-				m.columnSelectIndex = i
-				return m, nil
-			}
-		}
-	}
-
 	return m, nil
 }
 
@@ -1085,8 +981,6 @@ func (m KanbanBoardModel) View() string {
 		popupContent = m.sprintAssignPopup()
 	case ModeKanbanTaskDetail:
 		popupContent = m.taskDetailPopup()
-	case ModeKanbanColumnSelect:
-		popupContent = m.columnSelectPopup()
 	}
 
 	return m.overlayPopup(background, popupContent)
@@ -1205,12 +1099,21 @@ func (m KanbanBoardModel) kanbanView() string {
 	m.hiddenCount = 0
 	var columnViews []string
 	for i, col := range m.columns {
-		if col.Hidden {
-			m.hiddenCount++
-			continue
-		}
 		isActive := i == m.activeColumn
 		style := m.getColumnStyle(col.Name, isActive)
+
+		// Hidden columns render as narrow collapsed view
+		if col.Hidden {
+			m.hiddenCount++
+			style = style.Width(2)
+			// Render collapsed column with vertical name
+			collapsedContent := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#666666")).
+				Render("⋮\n" + col.Name + "\n⋮")
+			columnViews = append(columnViews, style.Render(collapsedContent))
+			continue
+		}
+
 		style = style.Width(columnWidth)
 
 		// Update column title with indicator if active
@@ -1244,13 +1147,7 @@ func (m KanbanBoardModel) kanbanView() string {
 	}
 
 	b.WriteString("\n\n")
-
-	if m.hiddenCount > 0 {
-		b.WriteString(fmt.Sprintf(" │ +%d hidden │ z: show hidden columns │", m.hiddenCount))
-		b.WriteString("\n\n")
-	}
-
-	b.WriteString(helpStyle.Render("←/→: switch cols • ↑/↓: navigate • d: details • s: status • c: comment • a: assignee • x: hide col • z: show hidden • q: quit"))
+	b.WriteString(helpStyle.Render("←/→: switch cols • ↑/↓: navigate • d: details • s: status • c: comment • a: assignee • x: toggle col • +//-: resize • q: quit"))
 
 	return b.String()
 }
@@ -1357,34 +1254,6 @@ func (m KanbanBoardModel) sprintAssignPopup() string {
 	b.WriteString(helpStyle.Render("↑/↓: navigate • enter: select • esc: back"))
 
 	// Wrap in popup style
-	return popupStyle.Render(b.String())
-}
-
-func (m KanbanBoardModel) columnSelectPopup() string {
-	var b strings.Builder
-
-	whiteStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF"))
-
-	b.WriteString(whiteStyle.Bold(true).Render("Show Hidden Columns"))
-	b.WriteString("\n\n")
-	b.WriteString(whiteStyle.Render("Select a column to show:\n\n"))
-
-	// Show only hidden columns
-	for i, col := range m.columns {
-		if !col.Hidden {
-			continue
-		}
-		if i == m.columnSelectIndex {
-			b.WriteString(selectedActionStyle.Render(fmt.Sprintf("▸ %s", col.Name)))
-		} else {
-			b.WriteString(whiteStyle.Render(fmt.Sprintf("  %s", col.Name)))
-		}
-		b.WriteString("\n")
-	}
-
-	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("↑/↓: navigate • ←/→: prev/next hidden • enter: show • esc: cancel"))
-
 	return popupStyle.Render(b.String())
 }
 
