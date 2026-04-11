@@ -697,8 +697,10 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "-":
 		// Decrease column width
 		m.resizeColumn(m.activeColumn, -5)
-	case "tab":
-		// Toggle focus between visible columns and hidden columns row
+	}
+
+	// Handle Tab key outside switch (tea.KeyMsg is a type, not a case)
+	if msg.Type == tea.KeyTab {
 		if m.hiddenCount > 0 {
 			m.focusHiddenColumns = !m.focusHiddenColumns
 			m.message = ""
@@ -708,6 +710,7 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 				m.message = "Visible columns focused"
 			}
 		}
+		return m, nil
 	}
 
 	return m, nil
