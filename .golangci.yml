@@ -1,5 +1,6 @@
 version: "2"
 
 linters:
-  disable:
-    - errcheck # pre-existing unchecked errors throughout codebase; tracked separately
+  default: none
+  enable:
+    - govet # catches real bugs: shadowing, printf mismatches, unreachable code
