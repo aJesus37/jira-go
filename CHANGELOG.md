@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-04-12
+
+### Fixed
+- Lowercase error strings to comply with Go conventions (ST1005)
+- Replace deprecated `viewport.LineUp`/`LineDown` with `ScrollUp`/`ScrollDown` (SA1019)
+- Remove redundant nil checks before `len()` calls (S1009)
+- Convert `if/else` chains into tagged switch statements (QF1003)
+- Replace `WriteString(fmt.Sprintf(...))` with `fmt.Fprintf` (QF1012)
+- Fix ineffectual assignments in cache cleanup (ineffassign)
+- Add errcheck suppressions and explicit error handling in API and cache layers
+- Expand golangci-lint config to enforce errcheck, ineffassign, and staticcheck
+
 ## [0.2.0] - 2026-04-11
 
 ### Added
@@ -54,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration wizard via `jira init`
 - TUI for interactive task browsing
 
-[Unreleased]: https://github.com/aJesus37/jira-go/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/aJesus37/jira-go/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/aJesus37/jira-go/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/aJesus37/jira-go/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aJesus37/jira-go/releases/tag/v0.1.0

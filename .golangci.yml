@@ -3,4 +3,7 @@ version: "2"
 linters:
   default: none
   enable:
-    - govet # catches real bugs: shadowing, printf mismatches, unreachable code
+    - govet       # catches real bugs: shadowing, printf mismatches, unreachable code
+    - errcheck    # unhandled errors
+    - ineffassign # assigned but never used
+    - staticcheck # SA1019 deprecated, S1009 nil-before-len, QF1003 tagged switch, QF1012 fmt.Fprintf, ST1005 error strings
