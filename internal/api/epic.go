@@ -121,7 +121,7 @@ func (c *Client) CreateEpic(projectKey, summary, description string) (*Epic, err
 	if err != nil {
 		return nil, fmt.Errorf("creating epic: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
@@ -143,7 +143,7 @@ func (c *Client) GetEpic(key string) (*Epic, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting epic: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("epic %s not found", key)
@@ -180,7 +180,7 @@ func (c *Client) UpdateEpic(key string, fields map[string]interface{}) error {
 	if err != nil {
 		return fmt.Errorf("updating epic: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("update epic failed: %s", resp.Status)
@@ -207,7 +207,7 @@ func (c *Client) LinkIssueToEpic(issueKey, epicKey string) error {
 	if err != nil {
 		return fmt.Errorf("linking issue to epic: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("link issue to epic failed: %s", resp.Status)
@@ -228,7 +228,7 @@ func (c *Client) UnlinkIssueFromEpic(issueKey string) error {
 	if err != nil {
 		return fmt.Errorf("unlinking issue from epic: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("unlink issue from epic failed: %s", resp.Status)

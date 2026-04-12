@@ -192,16 +192,16 @@ func copyBinary(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer sourceFile.Close()
+	defer sourceFile.Close() //nolint:errcheck
 
 	// Remove existing file if present
-	os.Remove(dst)
+	_ = os.Remove(dst)
 
 	destFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		return err
 	}
-	defer destFile.Close()
+	defer destFile.Close() //nolint:errcheck
 
 	_, err = io.Copy(destFile, sourceFile)
 	if err != nil {

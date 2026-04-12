@@ -75,7 +75,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	if !updateYes {
 		fmt.Print("Update? [y/N] ")
 		var answer string
-		fmt.Scanln(&answer)
+		_, _ = fmt.Scanln(&answer)
 		if strings.ToLower(strings.TrimSpace(answer)) != "y" {
 			fmt.Println("Aborted.")
 			return nil
@@ -131,7 +131,7 @@ func fetchLatestRelease() (*githubRelease, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("GitHub API returned %s", resp.Status)
@@ -150,25 +150,25 @@ func downloadAndInstall(url, installDir, goos string) error {
 		return fmt.Errorf("creating temp file: %w", err)
 	}
 	tmpName := tmpFile.Name()
-	defer os.Remove(tmpName)
+	defer func() { _ = os.Remove(tmpName) }()
 
 	resp, err := http.Get(url) //nolint:noctx
 	if err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return fmt.Errorf("downloading: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return fmt.Errorf("download failed: %s", resp.Status)
 	}
 
 	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return fmt.Errorf("writing download: %w", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	binaryName := "jira"
 	if goos == "windows" {
@@ -187,13 +187,13 @@ func extractTarGz(archivePath, binaryName, destPath string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	gz, err := gzip.NewReader(f)
 	if err != nil {
 		return fmt.Errorf("opening gzip: %w", err)
 	}
-	defer gz.Close()
+	defer gz.Close() //nolint:errcheck
 
 	tr := tar.NewReader(gz)
 	for {
@@ -216,7 +216,7 @@ func extractZip(archivePath, binaryName, destPath string) error {
 	if err != nil {
 		return fmt.Errorf("opening zip: %w", err)
 	}
-	defer r.Close()
+	defer r.Close() //nolint:errcheck
 
 	for _, f := range r.File {
 		if filepath.Base(f.Name) == binaryName {
@@ -224,7 +224,7 @@ func extractZip(archivePath, binaryName, destPath string) error {
 			if err != nil {
 				return err
 			}
-			defer rc.Close()
+			defer rc.Close() //nolint:errcheck
 			return writeExecutable(rc, destPath)
 		}
 	}

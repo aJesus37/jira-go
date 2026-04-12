@@ -74,7 +74,7 @@ func (c *Client) CreateIssue(projectKey, summary, description, issueType string)
 	if err != nil {
 		return nil, fmt.Errorf("creating issue: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
@@ -96,7 +96,7 @@ func (c *Client) GetIssue(key string, ownerFieldID string, sprintFieldID string)
 	if err != nil {
 		return nil, fmt.Errorf("getting issue: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("issue %s not found", key)
@@ -137,7 +137,7 @@ func (c *Client) SearchIssues(jql string, startAt, maxResults int, ownerFieldID 
 	if err != nil {
 		return nil, fmt.Errorf("searching issues: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -195,7 +195,7 @@ func (c *Client) UpdateIssue(key string, fields map[string]interface{}) error {
 	if err != nil {
 		return fmt.Errorf("updating issue: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("update issue failed: %s", resp.Status)
@@ -210,7 +210,7 @@ func (c *Client) DeleteIssue(key string) error {
 	if err != nil {
 		return fmt.Errorf("deleting issue: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("delete issue failed: %s", resp.Status)
@@ -229,7 +229,7 @@ func (c *Client) AssignIssue(key, accountID string) error {
 	if err != nil {
 		return fmt.Errorf("assigning issue: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("assign issue failed: %s", resp.Status)
@@ -341,7 +341,7 @@ func (c *Client) AddComment(key, body string) error {
 	if err != nil {
 		return fmt.Errorf("adding comment: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("add comment failed: %s", resp.Status)
@@ -362,7 +362,7 @@ func (c *Client) GetTransitions(key string) ([]Transition, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting transitions: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("get transitions failed: %s", resp.Status)
@@ -390,7 +390,7 @@ func (c *Client) TransitionIssue(key, transitionID string) error {
 	if err != nil {
 		return fmt.Errorf("transitioning issue: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("transition issue failed: %s", resp.Status)

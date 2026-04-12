@@ -30,7 +30,7 @@ func (c *Client) GetSprints(boardID int, state string) ([]models.Sprint, error) 
 	if err != nil {
 		return nil, fmt.Errorf("fetching sprints: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("get sprints failed: %s", resp.Status)
@@ -52,7 +52,7 @@ func (c *Client) GetOpenSprints(boardID int) ([]models.Sprint, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fetching open sprints: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("get open sprints failed: %s", resp.Status)
@@ -89,7 +89,7 @@ func (c *Client) CreateSprint(boardID int, name string, goal string, startDate, 
 	if err != nil {
 		return nil, fmt.Errorf("creating sprint: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("create sprint failed: %s", resp.Status)
@@ -133,7 +133,7 @@ func (c *Client) StartSprint(sprintID int, goal string) error {
 	if err != nil {
 		return fmt.Errorf("starting sprint: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -169,7 +169,7 @@ func (c *Client) CompleteSprint(sprintID int) error {
 	if err != nil {
 		return fmt.Errorf("completing sprint: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -200,7 +200,7 @@ func (c *Client) GetSprint(sprintID int) (*models.Sprint, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fetching sprint: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("get sprint failed: %s", resp.Status)
@@ -252,7 +252,7 @@ func (c *Client) UpdateSprint(sprintID int, name, goal string, startDate, endDat
 	if err != nil {
 		return nil, fmt.Errorf("updating sprint: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		// Try to read error body
@@ -297,7 +297,7 @@ func (c *Client) MoveIssuesToSprint(sprintID int, issueKeys []string) error {
 	if err != nil {
 		return fmt.Errorf("moving issues to sprint: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("move issues to sprint failed: %s", resp.Status)
@@ -314,7 +314,7 @@ func (c *Client) GetBoards(projectKey string) ([]map[string]interface{}, error) 
 	if err != nil {
 		return nil, fmt.Errorf("fetching boards: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("get boards failed: %s", resp.Status)

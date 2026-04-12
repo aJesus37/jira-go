@@ -98,7 +98,7 @@ func runCacheClear(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("opening cache: %w", err)
 	}
-	defer c.Close()
+	defer c.Close() //nolint:errcheck
 
 	if err := c.Clear(); err != nil {
 		return fmt.Errorf("clearing cache: %w", err)

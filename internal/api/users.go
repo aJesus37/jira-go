@@ -20,7 +20,7 @@ func (c *Client) ResolveEmail(email string) (*models.User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("searching user: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("user search failed: %s", resp.Status)
@@ -61,7 +61,7 @@ func (c *Client) GetCurrentUser() (*models.User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting current user: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get current user: %s", resp.Status)
@@ -89,7 +89,7 @@ func (c *Client) SearchUsers(query string) ([]models.User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("searching users: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("user search failed: %s", resp.Status)
