@@ -49,16 +49,18 @@ var (
 
 // Issue represents a simplified issue for TUI display
 type Issue struct {
-	Key           string
-	Summary       string
-	Type          string
-	Status        string
-	Assignee      string
-	AssigneeEmail string
-	Owners        []string
-	Description   string
-	Created       string
-	SprintName    string
+	Key             string
+	Summary         string
+	Type            string
+	Status          string
+	Assignee        string
+	AssigneeEmail   string
+	Owners          []string
+	OwnerEmails     []string
+	OwnerAccountIDs []string
+	Description     string
+	Created         string
+	SprintName      string
 }
 
 // IssueItem represents a list item for an issue
@@ -116,11 +118,6 @@ type actionCompletedMsg struct {
 	err    error
 }
 
-type issueRefreshedMsg struct {
-	issue *models.Issue
-	err   error
-}
-
 type sprintsLoadedMsg struct {
 	sprints []models.Sprint
 	err     error
@@ -131,6 +128,11 @@ type sprintAssignedMsg struct {
 	err        error
 }
 
+type usersSearchedMsg struct {
+	users []models.User
+	err   error
+}
+
 // ViewMode represents the current view mode
 type ViewMode int
 
@@ -139,6 +141,7 @@ const (
 	ModeDetail
 	ModeStatusChange
 	ModeAssigneeChange
+	ModeManageOwners
 	ModeAddComment
 	ModeSprintAssign
 )
@@ -177,6 +180,14 @@ type IssueListModel struct {
 	// Assignee change
 	assigneeInput string
 	ownersInput   string
+	searchResults []models.User
+	searchIndex   int
+
+	// Owner management
+	ownerSearchInput   string
+	ownerSearchResults []models.User
+	ownerSearchIndex   int
+	selectedOwnerIndex int
 
 	// Comment
 	commentInput textarea.Model
@@ -208,6 +219,8 @@ func NewIssueList(issues []models.Issue, client *api.Client, projectKey, ownerFi
 
 		for _, owner := range issue.Owners {
 			tuiIssue.Owners = append(tuiIssue.Owners, owner.DisplayName)
+			tuiIssue.OwnerEmails = append(tuiIssue.OwnerEmails, owner.Email)
+			tuiIssue.OwnerAccountIDs = append(tuiIssue.OwnerAccountIDs, owner.AccountID)
 		}
 
 		tuiIssues = append(tuiIssues, tuiIssue)
@@ -327,10 +340,10 @@ func (m IssueListModel) addComment(key, body string) tea.Cmd {
 func (m IssueListModel) refreshIssue(key string) tea.Cmd {
 	return func() tea.Msg {
 		if m.client == nil {
-			return issueRefreshedMsg{err: fmt.Errorf("no client")}
+			return issueLoadedMsg{issue: nil, err: fmt.Errorf("no client")}
 		}
 		issue, err := m.client.GetIssue(key, m.ownerFieldID, m.sprintFieldID)
-		return issueRefreshedMsg{issue: issue, err: err}
+		return issueLoadedMsg{issue: issue, err: err}
 	}
 }
 
@@ -359,6 +372,65 @@ func (m IssueListModel) assignToSprint(sprintID int, issueKey string) tea.Cmd {
 	}
 }
 
+// Async function to search users for autocomplete
+func (m IssueListModel) searchUsers(query string) tea.Cmd {
+	return func() tea.Msg {
+		if m.client == nil || query == "" {
+			return usersSearchedMsg{users: nil, err: nil}
+		}
+		users, err := m.client.SearchUsers(query)
+		return usersSearchedMsg{users: users, err: err}
+	}
+}
+
+// Async function to change assignee
+func (m IssueListModel) changeAssignee(issueKey, email string) tea.Cmd {
+	return func() tea.Msg {
+		if m.client == nil {
+			return actionCompletedMsg{action: "assignee", err: fmt.Errorf("no client")}
+		}
+		user, err := m.client.ResolveEmail(email)
+		if err != nil {
+			return actionCompletedMsg{action: "assignee", err: fmt.Errorf("resolving user: %w", err)}
+		}
+		err = m.client.AssignIssue(issueKey, user.AccountID)
+		return actionCompletedMsg{action: "assignee", err: err}
+	}
+}
+
+// Async function to add owner by email
+func (m IssueListModel) addOwner(issueKey, ownerFieldID, email string) tea.Cmd {
+	return func() tea.Msg {
+		if m.client == nil {
+			return actionCompletedMsg{action: "owner", err: fmt.Errorf("no client")}
+		}
+		err := m.client.AddOwnerToIssue(issueKey, ownerFieldID, email)
+		return actionCompletedMsg{action: "owner", err: err}
+	}
+}
+
+// Async function to add owner by account ID
+func (m IssueListModel) addOwnerByAccountID(issueKey, ownerFieldID, accountID string) tea.Cmd {
+	return func() tea.Msg {
+		if m.client == nil {
+			return actionCompletedMsg{action: "owner", err: fmt.Errorf("no client")}
+		}
+		err := m.client.AddOwnerByAccountID(issueKey, ownerFieldID, accountID)
+		return actionCompletedMsg{action: "owner", err: err}
+	}
+}
+
+// Async function to remove owner
+func (m IssueListModel) removeOwner(issueKey, ownerFieldID, accountID string) tea.Cmd {
+	return func() tea.Msg {
+		if m.client == nil {
+			return actionCompletedMsg{action: "owner", err: fmt.Errorf("no client")}
+		}
+		err := m.client.RemoveOwnerByAccountID(issueKey, ownerFieldID, accountID)
+		return actionCompletedMsg{action: "owner", err: err}
+	}
+}
+
 func (m IssueListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case issueLoadedMsg:
@@ -370,8 +442,12 @@ func (m IssueListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected.AssigneeEmail = msg.issue.Assignee.Email
 			}
 			m.selected.Owners = []string{}
+			m.selected.OwnerEmails = []string{}
+			m.selected.OwnerAccountIDs = []string{}
 			for _, o := range msg.issue.Owners {
 				m.selected.Owners = append(m.selected.Owners, fmt.Sprintf("%s (%s)", o.DisplayName, o.Email))
+				m.selected.OwnerEmails = append(m.selected.OwnerEmails, o.Email)
+				m.selected.OwnerAccountIDs = append(m.selected.OwnerAccountIDs, o.AccountID)
 			}
 			// Trigger markdown rendering
 			contentWidth := m.width - 4
@@ -403,74 +479,28 @@ func (m IssueListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		if msg.err == nil {
 			m.message = fmt.Sprintf("✓ %s completed successfully", msg.action)
-			// If status was changed, we need to refresh the issue data
-			if msg.action == "transition" && m.selected.Key != "" {
+			if (msg.action == "transition" || msg.action == "assignee" || msg.action == "owner") && m.selected.Key != "" {
 				return m, m.refreshIssue(m.selected.Key)
 			}
 		} else {
 			m.message = fmt.Sprintf("✗ %s failed: %v", msg.action, msg.err)
 		}
-		// Return to list view after action
 		m.mode = ModeList
 		return m, nil
 
-	case issueRefreshedMsg:
-		m.loading = false
-		if msg.err == nil && msg.issue != nil {
-			// Update the issue in our list
-			for i, issue := range m.issues {
-				if issue.Key == msg.issue.Key {
-					// Update the issue data
-					m.issues[i].Status = msg.issue.Status
-					m.issues[i].Summary = msg.issue.Summary
-					m.issues[i].Type = msg.issue.Type
-					m.issues[i].SprintName = msg.issue.SprintName
-					if msg.issue.Assignee != nil {
-						m.issues[i].Assignee = msg.issue.Assignee.DisplayName
-						m.issues[i].AssigneeEmail = msg.issue.Assignee.Email
-					}
-					m.issues[i].Owners = []string{}
-					for _, o := range msg.issue.Owners {
-						m.issues[i].Owners = append(m.issues[i].Owners, o.DisplayName)
-					}
-					break
-				}
-			}
-			// Also update the selected issue
-			m.selected.Status = msg.issue.Status
-			m.selected.SprintName = msg.issue.SprintName
-			// Refresh the list UI
-			items := make([]list.Item, len(m.issues))
-			for i, issue := range m.issues {
-				items[i] = IssueItem{issue: issue}
-			}
-			m.list.SetItems(items)
-		}
-		// Return to list view after refresh
-		m.mode = ModeList
-		return m, nil
-
-	case sprintsLoadedMsg:
-		m.loading = false
-		if msg.err == nil {
-			m.sprints = msg.sprints
-			m.sprintIndex = 0
-			m.mode = ModeSprintAssign
+	case usersSearchedMsg:
+		if msg.err != nil {
+			m.searchResults = nil
+			m.ownerSearchResults = nil
 		} else {
-			m.message = fmt.Sprintf("✗ Failed to load sprints: %v", msg.err)
-			m.mode = ModeList
-		}
-		return m, nil
-
-	case sprintAssignedMsg:
-		m.loading = false
-		if msg.err == nil {
-			m.message = fmt.Sprintf("✓ Issue added to sprint")
-			// Refresh the issue to get updated sprint info
-			return m, m.refreshIssue(m.selected.Key)
-		} else {
-			m.message = fmt.Sprintf("✗ Failed to add to sprint: %v", msg.err)
-			m.mode = ModeList
+			m.searchResults = msg.users
+			m.ownerSearchResults = msg.users
+			if m.searchIndex >= len(m.searchResults) {
+				m.searchIndex = 0
+			}
+			if m.ownerSearchIndex >= len(m.ownerSearchResults) {
+				m.ownerSearchIndex = 0
+			}
 		}
 		return m, nil
 
@@ -488,6 +518,8 @@ func (m IssueListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleStatusChangeKeys(msg)
 		case ModeAssigneeChange:
 			return m.handleAssigneeChangeKeys(msg)
+		case ModeManageOwners:
+			return m.handleManageOwnersKeys(msg)
 		case ModeAddComment:
 			return m.handleAddCommentKeys(msg)
 		case ModeSprintAssign:
@@ -569,12 +601,25 @@ func (m IssueListModel) handleListViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			return m, nil
 		}
 	case "a":
-		// Change owners/assignee from list view
+		// Change assignee from list view
 		if item, ok := m.list.SelectedItem().(IssueItem); ok {
 			m.selected = item.issue
 			m.mode = ModeAssigneeChange
-			m.assigneeInput = m.selected.Assignee
-			m.ownersInput = strings.Join(m.selected.Owners, ", ")
+			m.assigneeInput = ""
+			m.searchResults = nil
+			m.searchIndex = 0
+			m.message = ""
+			return m, nil
+		}
+	case "u":
+		// Manage owners from list view
+		if item, ok := m.list.SelectedItem().(IssueItem); ok {
+			m.selected = item.issue
+			m.mode = ModeManageOwners
+			m.ownerSearchInput = ""
+			m.ownerSearchResults = nil
+			m.ownerSearchIndex = 0
+			m.selectedOwnerIndex = -1
 			m.message = ""
 			return m, nil
 		}
@@ -596,10 +641,21 @@ func (m IssueListModel) handleListViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 
 func (m IssueListModel) handleDetailViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "q", "esc", "backspace":
+	case "q", "esc":
 		m.mode = ModeList
 		m.loading = false
 		m.renderedDesc = ""
+		m.message = ""
+		return m, nil
+	case "s":
+		m.loading = true
+		return m, m.loadTransitions(m.selected.Key)
+	case "u":
+		m.mode = ModeManageOwners
+		m.ownerSearchInput = ""
+		m.ownerSearchResults = nil
+		m.ownerSearchIndex = 0
+		m.selectedOwnerIndex = -1
 		m.message = ""
 		return m, nil
 	case "up", "k":
@@ -629,7 +685,7 @@ func (m IssueListModel) handleDetailViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd
 
 func (m IssueListModel) handleStatusChangeKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "q", "esc", "backspace":
+	case "q", "esc":
 		m.mode = ModeList
 		return m, nil
 	case "up", "k":
@@ -654,16 +710,135 @@ func (m IssueListModel) handleStatusChangeKeys(msg tea.KeyMsg) (tea.Model, tea.C
 
 func (m IssueListModel) handleAssigneeChangeKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "backspace":
+	case "esc":
 		m.mode = ModeList
+		m.assigneeInput = ""
+		m.searchResults = nil
+		return m, nil
+	case "backspace":
+		if len(m.assigneeInput) > 0 {
+			m.assigneeInput = m.assigneeInput[:len(m.assigneeInput)-1]
+			m.searchIndex = 0
+			if m.assigneeInput != "" {
+				return m, m.searchUsers(m.assigneeInput)
+			}
+			m.searchResults = nil
+		}
+		return m, nil
+	case "up", "k":
+		if len(m.searchResults) > 0 && m.searchIndex > 0 {
+			m.searchIndex--
+		}
+		return m, nil
+	case "down", "j":
+		if len(m.searchResults) > 0 && m.searchIndex < len(m.searchResults)-1 {
+			m.searchIndex++
+		}
+		return m, nil
+	case "enter":
+		if len(m.searchResults) > 0 && m.searchIndex < len(m.searchResults) {
+			selected := m.searchResults[m.searchIndex]
+			m.loading = true
+			m.assigneeInput = ""
+			m.searchResults = nil
+			return m, m.changeAssignee(m.selected.Key, selected.Email)
+		}
+		if m.assigneeInput != "" {
+			m.loading = true
+			m.searchResults = nil
+			return m, m.changeAssignee(m.selected.Key, m.assigneeInput)
+		}
 		return m, nil
 	case "ctrl+s":
-		// Save changes (placeholder - would need email lookup)
-		m.message = "Assignee change not yet implemented (requires email lookup)"
-		m.mode = ModeList
+		if m.assigneeInput != "" {
+			m.loading = true
+			m.searchResults = nil
+			return m, m.changeAssignee(m.selected.Key, m.assigneeInput)
+		}
 		return m, nil
+	default:
+		char := ""
+		if len(msg.Runes) > 0 {
+			char = string(msg.Runes[0])
+		} else if len(msg.String()) == 1 {
+			char = msg.String()
+		}
+		if char != "" {
+			m.assigneeInput += char
+			m.searchIndex = 0
+			return m, m.searchUsers(m.assigneeInput)
+		}
 	}
+	return m, nil
+}
 
+func (m IssueListModel) handleManageOwnersKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.mode = ModeList
+		m.ownerSearchInput = ""
+		m.ownerSearchResults = nil
+		m.selectedOwnerIndex = -1
+		return m, nil
+	case "up", "k":
+		if m.selectedOwnerIndex > 0 {
+			m.selectedOwnerIndex--
+		}
+		return m, nil
+	case "down", "j":
+		maxOwners := len(m.selected.Owners)
+		if m.ownerSearchResults != nil && len(m.ownerSearchResults) > 0 {
+			maxOwners = len(m.selected.Owners) + len(m.ownerSearchResults)
+		}
+		if m.selectedOwnerIndex < maxOwners-1 {
+			m.selectedOwnerIndex++
+		}
+		return m, nil
+	case "enter":
+		// First check if selecting an owner to remove
+		if m.selectedOwnerIndex >= 0 && m.selectedOwnerIndex < len(m.selected.Owners) {
+			accountID := m.selected.OwnerAccountIDs[m.selectedOwnerIndex]
+			m.loading = true
+			return m, m.removeOwner(m.selected.Key, m.ownerFieldID, accountID)
+		}
+
+		// Then check if selecting from search results to add
+		if m.ownerSearchResults != nil && len(m.ownerSearchResults) > 0 {
+			searchIdx := m.selectedOwnerIndex - len(m.selected.Owners)
+			if searchIdx >= 0 && searchIdx < len(m.ownerSearchResults) {
+				selected := m.ownerSearchResults[searchIdx]
+				m.loading = true
+				m.ownerSearchInput = ""
+				m.ownerSearchResults = nil
+				return m, m.addOwnerByAccountID(m.selected.Key, m.ownerFieldID, selected.AccountID)
+			}
+		}
+
+		return m, nil
+	case "backspace":
+		if len(m.ownerSearchInput) > 0 {
+			m.ownerSearchInput = m.ownerSearchInput[:len(m.ownerSearchInput)-1]
+			m.ownerSearchIndex = 0
+			if m.ownerSearchInput != "" {
+				return m, m.searchUsers(m.ownerSearchInput)
+			}
+			m.ownerSearchResults = nil
+		}
+		return m, nil
+	default:
+		char := ""
+		if len(msg.Runes) > 0 {
+			char = string(msg.Runes[0])
+		} else if len(msg.String()) == 1 {
+			char = msg.String()
+		}
+		if char != "" {
+			m.ownerSearchInput += char
+			m.ownerSearchIndex = 0
+			m.selectedOwnerIndex = len(m.selected.Owners)
+			return m, m.searchUsers(m.ownerSearchInput)
+		}
+	}
 	return m, nil
 }
 
@@ -720,12 +895,14 @@ func (m IssueListModel) View() string {
 		return m.statusChangeView()
 	case ModeAssigneeChange:
 		return m.assigneeChangeView()
+	case ModeManageOwners:
+		return m.manageOwnersView()
 	case ModeAddComment:
 		return m.addCommentView()
 	case ModeSprintAssign:
 		return m.sprintAssignView()
 	default:
-		return m.list.View() + "\n" + helpStyle.Render("↑/↓: navigate • enter/o: open • s: status • c: comment • a: assignee • p: put in sprint • q: quit")
+		return m.list.View() + "\n" + helpStyle.Render("↑/↓: navigate • enter/o: open • s: status • c: comment • a: assignee • u: owners • p: put in sprint • q: quit")
 	}
 }
 
@@ -782,7 +959,7 @@ func (m IssueListModel) detailView() string {
 	}
 
 	// Help text
-	help := helpStyle.Render("↑/↓/pgup/pgdown: scroll • a: actions • q/esc: back")
+	help := helpStyle.Render("↑/↓/pgup/pgdown: scroll • s: status • u: owners • q/esc: back")
 
 	return header + content + "\n\n" + help
 }
@@ -822,12 +999,124 @@ func (m IssueListModel) assigneeChangeView() string {
 	b.WriteString(titleStyle.Render(fmt.Sprintf(" %s ", m.selected.Key)))
 	b.WriteString("\n\n")
 	b.WriteString(selectedStyle.Render("Change Assignee"))
+	if m.selected.Assignee != "" {
+		b.WriteString(fmt.Sprintf(" (current: %s)", m.selected.Assignee))
+	}
 	b.WriteString("\n\n")
 
-	b.WriteString("Current assignee functionality requires email lookup.\n")
-	b.WriteString("This feature will be available in a future update.\n\n")
+	if m.loading {
+		b.WriteString(loadingStyle.Render("Updating assignee..."))
+	} else {
+		b.WriteString(selectedStyle.Render("Type to search or enter email:"))
+		b.WriteString("\n\n")
 
-	b.WriteString(helpStyle.Render("esc: back"))
+		inputStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Background(lipgloss.Color("#333333")).
+			Padding(1, 2).
+			Width(50)
+
+		b.WriteString(inputStyle.Render("> " + m.assigneeInput + "_"))
+		b.WriteString("\n\n")
+
+		if len(m.searchResults) > 0 {
+			b.WriteString("Matching users:\n")
+			for i, user := range m.searchResults {
+				prefix := "  "
+				style := lipgloss.NewStyle().Foreground(lipgloss.Color("#808080"))
+				if i == m.searchIndex {
+					prefix = "▸ "
+					style = lipgloss.NewStyle().
+						Foreground(lipgloss.Color("#00C851")).
+						Bold(true)
+				}
+				displayName := user.DisplayName
+				if user.Email != "" {
+					displayName = fmt.Sprintf("%s (%s)", user.DisplayName, user.Email)
+				}
+				b.WriteString(style.Render(fmt.Sprintf("%s%s\n", prefix, displayName)))
+			}
+			b.WriteString("\n")
+		} else if m.assigneeInput != "" {
+			b.WriteString("Press Enter to assign, or type full email\n")
+		}
+	}
+
+	b.WriteString(helpStyle.Render("↑/↓: navigate • Enter: select • Esc: cancel"))
+
+	return b.String()
+}
+
+func (m IssueListModel) manageOwnersView() string {
+	var b strings.Builder
+
+	b.WriteString(titleStyle.Render(fmt.Sprintf(" %s ", m.selected.Key)))
+	b.WriteString("\n\n")
+	b.WriteString(selectedStyle.Render("Manage Owners"))
+	b.WriteString("\n\n")
+
+	if m.loading {
+		b.WriteString(loadingStyle.Render("Updating owners..."))
+	} else {
+		if len(m.selected.Owners) > 0 {
+			b.WriteString("Current owners (↑/↓ to select, Enter to remove):\n\n")
+			for i, owner := range m.selected.Owners {
+				prefix := "  "
+				style := lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#808080")).
+					Width(m.width - 4)
+				if m.selectedOwnerIndex == i {
+					prefix = "▸ "
+					style = lipgloss.NewStyle().
+						Foreground(lipgloss.Color("#FF4444")).
+						Bold(true).
+						Width(m.width - 4)
+				}
+				b.WriteString(style.Render(fmt.Sprintf("%s%s", prefix, owner)))
+				b.WriteString("\n")
+			}
+			b.WriteString("\n")
+		} else {
+			b.WriteString("No owners assigned.\n\n")
+		}
+
+		b.WriteString(selectedStyle.Render("Type to search and add owner:"))
+		b.WriteString("\n\n")
+
+		inputStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Background(lipgloss.Color("#333333")).
+			Padding(1, 2).
+			Width(50)
+
+		b.WriteString(inputStyle.Render("> " + m.ownerSearchInput + "_"))
+		b.WriteString("\n\n")
+
+		if len(m.ownerSearchResults) > 0 {
+			b.WriteString("Matching users (Enter to add):\n")
+			for i, user := range m.ownerSearchResults {
+				prefix := "  "
+				style := lipgloss.NewStyle().Foreground(lipgloss.Color("#808080"))
+				idx := len(m.selected.Owners) + i
+				if m.selectedOwnerIndex == idx {
+					prefix = "▸ "
+					style = lipgloss.NewStyle().
+						Foreground(lipgloss.Color("#00C851")).
+						Bold(true)
+				}
+				displayName := user.DisplayName
+				if user.Email != "" {
+					displayName = fmt.Sprintf("%s (%s)", user.DisplayName, user.Email)
+				}
+				b.WriteString(style.Render(fmt.Sprintf("%s%s\n", prefix, displayName)))
+			}
+			b.WriteString("\n")
+		} else if m.ownerSearchInput != "" {
+			b.WriteString("Press Enter to add as owner, or type full email\n")
+		}
+	}
+
+	b.WriteString(helpStyle.Render("↑/↓: navigate • Enter: add/remove • Esc: cancel • Backspace: delete"))
 
 	return b.String()
 }

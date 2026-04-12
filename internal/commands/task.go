@@ -14,6 +14,10 @@ import (
 	"github.com/user/jira-go/internal/tui"
 )
 
+func escapeJQL(s string) string {
+	return strings.ReplaceAll(s, "'", "'\\''")
+}
+
 var taskCmd = &cobra.Command{
 	Use:   "task",
 	Short: "Manage Jira tasks/issues",
@@ -117,17 +121,6 @@ func init() {
 	taskEditCmd.Flags().String("owners", "", "Comma-separated owner emails")
 }
 
-func getProjectKey(cmd *cobra.Command, cfg *config.Config) string {
-	// Check global flag first
-	if projectFlag != "" {
-		return projectFlag
-	}
-	if project, _ := cmd.Flags().GetString("project"); project != "" {
-		return project
-	}
-	return cfg.DefaultProject
-}
-
 func runTaskList(cmd *cobra.Command, args []string) error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -142,7 +135,7 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Build JQL query
-	jql := fmt.Sprintf("project = %s", projectKey)
+	jql := fmt.Sprintf("project = '%s'", escapeJQL(projectKey))
 
 	if assignee, _ := cmd.Flags().GetString("assignee"); assignee != "" {
 		// Resolve email to account ID for JQL
@@ -150,11 +143,11 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("resolving assignee email: %w", err)
 		}
-		jql += fmt.Sprintf(" AND assignee = '%s'", user.AccountID)
+		jql += fmt.Sprintf(" AND assignee = '%s'", escapeJQL(user.AccountID))
 	}
 
 	if status, _ := cmd.Flags().GetString("status"); status != "" {
-		jql += fmt.Sprintf(" AND status = '%s'", status)
+		jql += fmt.Sprintf(" AND status = '%s'", escapeJQL(status))
 	}
 
 	// Filter for active tasks only (exclude done status category)
@@ -207,6 +200,9 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 	// Check if we should run in non-interactive mode
 	format, _ := cmd.Flags().GetString("format")
 	showAge, _ := cmd.Flags().GetBool("age")
+	if format == "" {
+		format = "table"
+	}
 	if noInteractiveFlag || format != "table" || showAge {
 		mergeAssigneeOwner := project.MergeAssigneeOwner == nil || *project.MergeAssigneeOwner
 		return displayTaskListTable(resp.Issues, resp.Total, mergeAssigneeOwner, format, showAge)

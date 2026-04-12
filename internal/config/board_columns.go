@@ -31,7 +31,7 @@ func LoadBoardColumns(projectKey string) (BoardColumnPrefs, error) {
 
 	var allPrefs map[string]BoardColumnPrefs
 	if err := json.Unmarshal(data, &allPrefs); err != nil {
-		return nil, err
+		return make(BoardColumnPrefs), nil
 	}
 
 	if prefs, ok := allPrefs[projectKey]; ok {

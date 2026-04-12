@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -121,13 +122,19 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("default project is required (set via config or JIRA_GO_DEFAULT_PROJECT env var)")
 	}
 
-	if _, err := c.GetProject(c.DefaultProject); err != nil {
+	project, err := c.GetProject(c.DefaultProject)
+	if err != nil {
 		return fmt.Errorf("default project '%s' not found in projects configuration", c.DefaultProject)
 	}
 
-	project, _ := c.GetProject(c.DefaultProject)
 	if project.JiraURL == "" {
 		return fmt.Errorf("Jira URL is required for project %s", c.DefaultProject)
+	}
+
+	// Validate Jira URL has proper scheme
+	u, err := url.Parse(project.JiraURL)
+	if err != nil || u.Scheme == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return fmt.Errorf("Jira URL must be a valid URL with scheme (e.g., https://your-domain.atlassian.net)")
 	}
 
 	return nil

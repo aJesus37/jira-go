@@ -75,3 +75,8 @@ tasks:
       - task: fmt
       - task: lint
       - task: test
+
+  install-skills:
+    desc: Install agent skills to ~/.agents/skills/jira-go
+    cmds:
+      - bash ./install-skills.sh

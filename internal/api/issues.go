@@ -158,6 +158,33 @@ func (c *Client) SearchIssues(jql string, startAt, maxResults int, ownerFieldID 
 	return &result, nil
 }
 
+// SearchIssuesAll searches for all issues matching JQL, automatically fetching all pages
+func (c *Client) SearchIssuesAll(jql string, maxResults int, ownerFieldID string, sprintFieldID string) ([]models.Issue, int, error) {
+	if maxResults <= 0 {
+		maxResults = 100
+	}
+
+	var allIssues []models.Issue
+	startAt := 0
+
+	for {
+		result, err := c.SearchIssues(jql, startAt, maxResults, ownerFieldID, sprintFieldID)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		allIssues = append(allIssues, result.Issues...)
+
+		if len(allIssues) >= result.Total || len(result.Issues) == 0 {
+			break
+		}
+
+		startAt += len(result.Issues)
+	}
+
+	return allIssues, len(allIssues), nil
+}
+
 // UpdateIssue updates an existing issue
 func (c *Client) UpdateIssue(key string, fields map[string]interface{}) error {
 	payload := map[string]interface{}{
@@ -226,6 +253,68 @@ func (c *Client) UpdateMultiOwnerField(key, fieldID string, accountIDs []string)
 	}
 
 	return c.UpdateIssue(key, fields)
+}
+
+// AddOwnerToIssue adds a single owner to an issue's multi-owner field (by email)
+func (c *Client) AddOwnerToIssue(issueKey, fieldID, ownerEmail string) error {
+	user, err := c.ResolveEmail(ownerEmail)
+	if err != nil {
+		return fmt.Errorf("resolving owner email: %w", err)
+	}
+
+	return c.AddOwnerByAccountID(issueKey, fieldID, user.AccountID)
+}
+
+// AddOwnerByAccountID adds a single owner to an issue's multi-owner field (by account ID)
+func (c *Client) AddOwnerByAccountID(issueKey, fieldID, accountID string) error {
+	issue, err := c.GetIssue(issueKey, fieldID, "")
+	if err != nil {
+		return fmt.Errorf("getting issue: %w", err)
+	}
+
+	for _, owner := range issue.Owners {
+		if owner.AccountID == accountID {
+			return nil
+		}
+	}
+
+	currentOwners := make([]string, 0)
+	for _, owner := range issue.Owners {
+		if owner.AccountID != "" {
+			currentOwners = append(currentOwners, owner.AccountID)
+		}
+	}
+
+	currentOwners = append(currentOwners, accountID)
+
+	return c.UpdateMultiOwnerField(issueKey, fieldID, currentOwners)
+}
+
+// RemoveOwnerFromIssue removes a single owner from an issue's multi-owner field (by email)
+func (c *Client) RemoveOwnerFromIssue(issueKey, fieldID, ownerEmail string) error {
+	user, err := c.ResolveEmail(ownerEmail)
+	if err != nil {
+		return fmt.Errorf("resolving owner email: %w", err)
+	}
+
+	return c.RemoveOwnerByAccountID(issueKey, fieldID, user.AccountID)
+}
+
+// RemoveOwnerByAccountID removes a single owner from an issue's multi-owner field (by account ID)
+func (c *Client) RemoveOwnerByAccountID(issueKey, fieldID, accountID string) error {
+	issue, err := c.GetIssue(issueKey, fieldID, "")
+	if err != nil {
+		return fmt.Errorf("getting issue: %w", err)
+	}
+
+	currentOwners := make([]string, 0)
+	for _, owner := range issue.Owners {
+		if owner.AccountID != "" && owner.AccountID != accountID {
+			currentOwners = append(currentOwners, owner.AccountID)
+		}
+	}
+
+	return c.UpdateMultiOwnerField(issueKey, fieldID, currentOwners)
 }
 
 // AddComment adds a comment to an issue
