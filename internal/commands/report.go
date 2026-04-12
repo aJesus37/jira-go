@@ -8,10 +8,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/aJesus37/jira-go/internal/api"
 	"github.com/aJesus37/jira-go/internal/config"
 	"github.com/aJesus37/jira-go/internal/models"
+	"github.com/spf13/cobra"
 )
 
 // AssigneeSummary aggregates issue data per person.

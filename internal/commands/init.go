@@ -8,8 +8,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/spf13/cobra"
 	"github.com/aJesus37/jira-go/internal/config"
+	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
 

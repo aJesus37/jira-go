@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/spf13/cobra"
 	"github.com/aJesus37/jira-go/internal/cache"
 	"github.com/aJesus37/jira-go/internal/config"
+	"github.com/spf13/cobra"
 )
 
 var cacheCmd = &cobra.Command{

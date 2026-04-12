@@ -1,8 +1,8 @@
 package commands_test
 
 import (
-	"testing"
 	"github.com/aJesus37/jira-go/internal/commands"
+	"testing"
 )
 
 func TestTaskCommentCommandRegistered(t *testing.T) {

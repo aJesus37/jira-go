@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aJesus37/jira-go/internal/api"
+	"github.com/aJesus37/jira-go/internal/models"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/aJesus37/jira-go/internal/api"
-	"github.com/aJesus37/jira-go/internal/models"
 )
 
 var (

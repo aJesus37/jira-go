@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aJesus37/jira-go/internal/models"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/aJesus37/jira-go/internal/models"
 )
 
 var (

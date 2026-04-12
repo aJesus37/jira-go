@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/aJesus37/jira-go/internal/api"
 	"github.com/aJesus37/jira-go/internal/config"
+	"github.com/spf13/cobra"
 )
 
 var projectCmd = &cobra.Command{
