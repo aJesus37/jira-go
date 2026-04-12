@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/user/jira-go/internal/models"
+	"github.com/aJesus37/jira-go/internal/models"
 )
 
 func TestDaysInStatusUsesUpdated(t *testing.T) {

@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/user/jira-go/internal/cache"
-	"github.com/user/jira-go/internal/config"
+	"github.com/aJesus37/jira-go/internal/cache"
+	"github.com/aJesus37/jira-go/internal/config"
 )
 
 var cacheCmd = &cobra.Command{

@@ -12,7 +12,7 @@ import (
 	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/user/jira-go/internal/models"
+	"github.com/aJesus37/jira-go/internal/models"
 )
 
 var (

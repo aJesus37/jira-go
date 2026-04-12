@@ -3,7 +3,7 @@ package commands
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/user/jira-go/internal/config"
+	"github.com/aJesus37/jira-go/internal/config"
 )
 
 func getProjectKey(cmd *cobra.Command, cfg *config.Config) string {

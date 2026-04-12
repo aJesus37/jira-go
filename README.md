@@ -18,7 +18,7 @@ A comprehensive CLI tool for managing Jira Software projects with support for ta
 ### From Source
 
 ```bash
-git clone https://github.com/user/jira
+git clone https://github.com/aJesus37/jira-go
 cd jira
 task build
 ```

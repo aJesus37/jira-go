@@ -3,7 +3,7 @@ package commands_test
 import (
 	"testing"
 
-	"github.com/user/jira-go/internal/commands"
+	"github.com/aJesus37/jira-go/internal/commands"
 )
 
 func TestTaskCreateHasStatusFlag(t *testing.T) {

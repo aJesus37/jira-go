@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/user/jira-go/internal/api"
-	"github.com/user/jira-go/internal/config"
+	"github.com/aJesus37/jira-go/internal/api"
+	"github.com/aJesus37/jira-go/internal/config"
 )
 
 var projectCmd = &cobra.Command{

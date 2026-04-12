@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/user/jira-go/internal/config"
+	"github.com/aJesus37/jira-go/internal/config"
 	"golang.org/x/term"
 )
 

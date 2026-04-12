@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/user/jira-go/internal/models"
+	"github.com/aJesus37/jira-go/internal/models"
 )
 
 // IssueSearchRequest represents a JQL search request

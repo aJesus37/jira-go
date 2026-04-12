@@ -44,5 +44,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration wizard via `jira init`
 - TUI for interactive task browsing
 
-[Unreleased]: https://github.com/user/jira-go/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/user/jira-go/releases/tag/v0.1.0
+[Unreleased]: https://github.com/aJesus37/jira-go/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/aJesus37/jira-go/releases/tag/v0.1.0

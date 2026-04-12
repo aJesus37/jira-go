@@ -41,7 +41,7 @@ task lint
 
 ### Reporting Bugs
 
-1. Check if the bug has already been reported in [Issues](https://github.com/user/jira-go/issues)
+1. Check if the bug has already been reported in [Issues](https://github.com/aJesus37/jira-go/issues)
 2. If not, create a new issue with:
    - Clear description of the bug
    - Steps to reproduce
@@ -51,7 +51,7 @@ task lint
 
 ### Suggesting Features
 
-1. Check if the feature has already been suggested in [Issues](https://github.com/user/jira-go/issues)
+1. Check if the feature has already been suggested in [Issues](https://github.com/aJesus37/jira-go/issues)
 2. If not, create a new issue with the `enhancement` label
 3. Describe the feature and its use case
 4. Explain why it would be useful to most users

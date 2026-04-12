@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/user/jira-go/internal/commands"
+	"github.com/aJesus37/jira-go/internal/commands"
 )
 
 func main() {

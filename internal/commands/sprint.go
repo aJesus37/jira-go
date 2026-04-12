@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/user/jira-go/internal/api"
-	"github.com/user/jira-go/internal/config"
-	"github.com/user/jira-go/internal/models"
-	"github.com/user/jira-go/internal/tui"
+	"github.com/aJesus37/jira-go/internal/api"
+	"github.com/aJesus37/jira-go/internal/config"
+	"github.com/aJesus37/jira-go/internal/models"
+	"github.com/aJesus37/jira-go/internal/tui"
 )
 
 var sprintCmd = &cobra.Command{

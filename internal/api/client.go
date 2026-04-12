@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/user/jira-go/internal/config"
+	"github.com/aJesus37/jira-go/internal/config"
 )
 
 // Client wraps the Jira API client

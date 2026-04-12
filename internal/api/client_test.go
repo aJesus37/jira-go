@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/user/jira-go/internal/config"
+	"github.com/aJesus37/jira-go/internal/config"
 )
 
 func TestNewClient(t *testing.T) {

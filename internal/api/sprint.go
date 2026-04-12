@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/user/jira-go/internal/models"
+	"github.com/aJesus37/jira-go/internal/models"
 )
 
 // SprintListResponse represents the response from listing sprints
