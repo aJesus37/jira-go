@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-11
+
 ### Added
 - Interactive sprint editing with `jira sprint edit` command
 - Sprint management: create, start, complete, edit sprints
@@ -23,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sprint board column reordering with `[`/`]` keys
 - Sprint board focus cycling between visible/hidden columns with `f` key
 - Configurable assignee+owner merging via `merge_assignee_owner` setting
+- Interactive owner management in TUI (`u` key): add/remove owners with live user search autocomplete
+- `jira update` command: self-update binary from GitHub Releases with `--check`, `--yes`, and `--path` flags
+- `--format` flag defaults to `table` across task list, sprint issues, and report commands
+- Sprint date validation: end date cannot be before start date
+- Jira URL scheme validation on config load (must be http or https)
+- Dynamic standup status ordering and coloring in ceremony view
+- `SearchIssuesAll` API method for automatic pagination
+- JQL injection protection via `escapeJQL` helper
 
 ### Features
 - List, view, create, edit, delete Jira issues
@@ -44,5 +54,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration wizard via `jira init`
 - TUI for interactive task browsing
 
-[Unreleased]: https://github.com/aJesus37/jira-go/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/aJesus37/jira-go/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/aJesus37/jira-go/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aJesus37/jira-go/releases/tag/v0.1.0
