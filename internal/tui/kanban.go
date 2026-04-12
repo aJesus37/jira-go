@@ -300,10 +300,10 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 		delegate.SetHeight(2)
 		delegate.SetSpacing(1)
 		// Set max width to prevent wrapping and ensure proper truncation
-		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(35)
-		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(35)
-		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(35)
-		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(35)
+		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.MaxWidth(35)
+		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.MaxWidth(35)
+		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.MaxWidth(35)
+		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.MaxWidth(35)
 		l := list.New(items, delegate, 35, 18)
 		l.Title = fmt.Sprintf("%s (%d)", status, len(statusIssues))
 		l.SetShowStatusBar(false)
@@ -923,16 +923,16 @@ func (m KanbanBoardModel) handleTaskDetailKeys(msg tea.KeyMsg) (tea.Model, tea.C
 		m.detailIssue = nil
 		return m, nil
 	case "up", "k":
-		m.detailVP.LineUp(1)
+		m.detailVP.ScrollUp(1)
 		return m, nil
 	case "down", "j":
-		m.detailVP.LineDown(1)
+		m.detailVP.ScrollDown(1)
 		return m, nil
 	case "pgup":
-		m.detailVP.HalfViewUp()
+		m.detailVP.HalfPageUp()
 		return m, nil
 	case "pgdown", " ":
-		m.detailVP.HalfViewDown()
+		m.detailVP.HalfPageDown()
 		return m, nil
 	case "home", "g":
 		m.detailVP.GotoTop()
@@ -1333,10 +1333,10 @@ func (m KanbanBoardModel) kanbanView() string {
 		if itemWidth < 21 {
 			itemWidth = 21
 		}
-		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Copy().MaxWidth(itemWidth)
-		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Copy().MaxWidth(itemWidth)
-		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Copy().MaxWidth(itemWidth)
-		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Copy().MaxWidth(itemWidth)
+		delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.MaxWidth(itemWidth)
+		delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.MaxWidth(itemWidth)
+		delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.MaxWidth(itemWidth)
+		delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.MaxWidth(itemWidth)
 		if isActive && !m.focusHiddenColumns {
 			// Use purple for selected items in active column (only when not focusing hidden columns)
 			delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("#7D56F4"))

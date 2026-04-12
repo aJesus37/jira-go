@@ -56,7 +56,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	boardID := getExistingBoardID(existingCfg, defaultProject)
 	boardIDStr := getInputWithDefault(reader, "Board ID", formatIntDefault(boardID))
 	if boardIDStr != "" {
-		fmt.Sscanf(boardIDStr, "%d", &boardID)
+		_, _ = fmt.Sscanf(boardIDStr, "%d", &boardID)
 	}
 
 	// Multi-owner field (optional)

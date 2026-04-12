@@ -419,7 +419,7 @@ func extractADFListItems(node map[string]interface{}, indent string) string {
 
 		// Write bullet or number
 		if node["type"] == "orderedList" {
-			result.WriteString(fmt.Sprintf("%s%d. ", indent, i+1))
+			fmt.Fprintf(&result, "%s%d. ", indent, i+1)
 		} else {
 			result.WriteString(indent + "- ")
 		}
