@@ -547,7 +547,7 @@ func (m *KanbanBoardModel) saveColumnPrefs() {
 			Order:   i,
 		}
 	}
-	config.SaveBoardColumns(m.projectKey, prefs)
+	_ = config.SaveBoardColumns(m.projectKey, prefs)
 }
 
 func (m *KanbanBoardModel) saveColumnOrder() {
@@ -560,7 +560,7 @@ func (m *KanbanBoardModel) saveColumnOrder() {
 			Order:   i,
 		}
 	}
-	config.SaveBoardColumns(m.projectKey, prefs)
+	_ = config.SaveBoardColumns(m.projectKey, prefs)
 }
 
 func (m KanbanBoardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

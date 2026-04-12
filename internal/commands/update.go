@@ -239,8 +239,8 @@ func writeExecutable(r io.Reader, destPath string) error {
 	}
 	tmpName := tmp.Name()
 	defer func() {
-		tmp.Close()
-		os.Remove(tmpName) // no-op if rename succeeded
+		_ = tmp.Close()
+		_ = os.Remove(tmpName) // no-op if rename succeeded
 	}()
 
 	if err := tmp.Chmod(0755); err != nil {
@@ -249,7 +249,7 @@ func writeExecutable(r io.Reader, destPath string) error {
 	if _, err := io.Copy(tmp, r); err != nil {
 		return fmt.Errorf("writing binary: %w", err)
 	}
-	tmp.Close()
+	_ = tmp.Close()
 
 	return os.Rename(tmpName, destPath)
 }

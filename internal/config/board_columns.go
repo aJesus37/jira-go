@@ -46,7 +46,7 @@ func SaveBoardColumns(projectKey string, prefs BoardColumnPrefs) error {
 	// Load existing
 	var allPrefs map[string]BoardColumnPrefs
 	if data, err := os.ReadFile(path); err == nil {
-		json.Unmarshal(data, &allPrefs)
+		_ = json.Unmarshal(data, &allPrefs)
 	} else {
 		allPrefs = make(map[string]BoardColumnPrefs)
 	}
@@ -54,7 +54,7 @@ func SaveBoardColumns(projectKey string, prefs BoardColumnPrefs) error {
 	allPrefs[projectKey] = prefs
 
 	dir := filepath.Dir(path)
-	os.MkdirAll(dir, 0755)
+	_ = os.MkdirAll(dir, 0755)
 
 	out, _ := json.MarshalIndent(allPrefs, "", "  ")
 	return os.WriteFile(path, out, 0600)

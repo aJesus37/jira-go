@@ -33,5 +33,5 @@ func TestSaveBoardColumns(t *testing.T) {
 	}
 
 	// Cleanup
-	os.Remove(GetBoardColumnsPath())
+	_ = os.Remove(GetBoardColumnsPath())
 }

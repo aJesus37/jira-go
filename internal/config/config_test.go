@@ -11,7 +11,7 @@ func TestLoad(t *testing.T) {
 	// Create temp config dir
 	tmpDir := t.TempDir()
 	configDir := filepath.Join(tmpDir, ".config", "jira-go")
-	os.MkdirAll(configDir, 0755)
+	_ = os.MkdirAll(configDir, 0755)
 
 	configPath := filepath.Join(configDir, "config.yaml")
 	configContent := `
@@ -25,10 +25,10 @@ projects:
     board_id: 1
     multi_owner_field: customfield_10001
 `
-	os.WriteFile(configPath, []byte(configContent), 0600)
+	_ = os.WriteFile(configPath, []byte(configContent), 0600)
 
 	// Set config path env var
-	os.Setenv("JIRA_GO_CONFIG", configPath)
+	_ = os.Setenv("JIRA_GO_CONFIG", configPath)
 
 	cfg, err := Load()
 	if err != nil {
