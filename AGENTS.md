@@ -247,7 +247,7 @@ The CLI requires a Jira Cloud instance with:
 
 ### Working with the Cache
 ```go
-import "github.com/user/jira-go/internal/cache"
+import "github.com/aJesus37/jira-go/internal/cache"
 
 // Get cache path from config
 cachePath := config.GetCachePath()
