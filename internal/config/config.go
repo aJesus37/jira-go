@@ -128,13 +128,13 @@ func (c *Config) Validate() error {
 	}
 
 	if project.JiraURL == "" {
-		return fmt.Errorf("Jira URL is required for project %s", c.DefaultProject)
+		return fmt.Errorf("jira URL is required for project %s", c.DefaultProject)
 	}
 
 	// Validate Jira URL has proper scheme
 	u, err := url.Parse(project.JiraURL)
 	if err != nil || u.Scheme == "" || (u.Scheme != "http" && u.Scheme != "https") {
-		return fmt.Errorf("Jira URL must be a valid URL with scheme (e.g., https://your-domain.atlassian.net)")
+		return fmt.Errorf("jira URL must be a valid URL with scheme (e.g., https://your-domain.atlassian.net)")
 	}
 
 	return nil

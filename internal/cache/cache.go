@@ -32,7 +32,7 @@ func New(dbPath string) (*Cache, error) {
 	cache := &Cache{db: db}
 
 	if err := cache.createTables(); err != nil {
-		db.Close()
+		db.Close() //nolint:errcheck
 		return nil, fmt.Errorf("creating tables: %w", err)
 	}
 
@@ -82,8 +82,8 @@ func (c *Cache) Set(key string, data []byte, ttl time.Duration) error {
 
 // Get retrieves data from the cache
 func (c *Cache) Get(key string) ([]byte, error) {
-	// Clean expired entries first
-	c.Cleanup()
+	// Clean expired entries first (ignore cleanup errors; best-effort)
+	_ = c.Cleanup()
 
 	var data []byte
 	query := `SELECT data FROM cache WHERE key = ? AND expires_at > ?`
@@ -107,8 +107,10 @@ func (c *Cache) Delete(key string) error {
 
 // Cleanup removes expired entries
 func (c *Cache) Cleanup() error {
-	_, err := c.db.Exec("DELETE FROM cache WHERE expires_at <= ?", time.Now())
-	_, err = c.db.Exec("DELETE FROM user_mappings WHERE expires_at <= ?", time.Now())
+	if _, err := c.db.Exec("DELETE FROM cache WHERE expires_at <= ?", time.Now()); err != nil {
+		return err
+	}
+	_, err := c.db.Exec("DELETE FROM user_mappings WHERE expires_at <= ?", time.Now())
 	return err
 }
 
