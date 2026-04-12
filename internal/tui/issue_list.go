@@ -559,9 +559,10 @@ func (m IssueListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	if m.mode == ModeList {
+	switch m.mode {
+	case ModeList:
 		m.list, cmd = m.list.Update(msg)
-	} else if m.mode == ModeDetail {
+	case ModeDetail:
 		m.viewport, cmd = m.viewport.Update(msg)
 	}
 	return m, cmd
@@ -665,10 +666,10 @@ func (m IssueListModel) handleDetailViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd
 		m.viewport, _ = m.viewport.Update(msg)
 		return m, nil
 	case "pgup":
-		m.viewport.LineUp(10)
+		m.viewport.ScrollUp(10)
 		return m, nil
 	case "pgdown", " ":
-		m.viewport.LineDown(10)
+		m.viewport.ScrollDown(10)
 		return m, nil
 	case "home":
 		m.viewport.GotoTop()
@@ -787,7 +788,7 @@ func (m IssueListModel) handleManageOwnersKeys(msg tea.KeyMsg) (tea.Model, tea.C
 		return m, nil
 	case "down", "j":
 		maxOwners := len(m.selected.Owners)
-		if m.ownerSearchResults != nil && len(m.ownerSearchResults) > 0 {
+		if len(m.ownerSearchResults) > 0 {
 			maxOwners = len(m.selected.Owners) + len(m.ownerSearchResults)
 		}
 		if m.selectedOwnerIndex < maxOwners-1 {
@@ -803,7 +804,7 @@ func (m IssueListModel) handleManageOwnersKeys(msg tea.KeyMsg) (tea.Model, tea.C
 		}
 
 		// Then check if selecting from search results to add
-		if m.ownerSearchResults != nil && len(m.ownerSearchResults) > 0 {
+		if len(m.ownerSearchResults) > 0 {
 			searchIdx := m.selectedOwnerIndex - len(m.selected.Owners)
 			if searchIdx >= 0 && searchIdx < len(m.ownerSearchResults) {
 				selected := m.ownerSearchResults[searchIdx]

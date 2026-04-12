@@ -353,7 +353,7 @@ func (m CeremonyModel) viewDailyStandup() string {
 
 	// Show timer if active
 	if m.activeTimer {
-		b.WriteString(fmt.Sprintf("⏱️  Time remaining: %s\n\n", m.timer.View()))
+		fmt.Fprintf(&b, "⏱️  Time remaining: %s\n\n", m.timer.View())
 	}
 
 	if m.currentMember >= len(m.updates) {
@@ -486,7 +486,7 @@ func (m CeremonyModel) viewDailyStandup() string {
 				Bold(true).
 				Foreground(lipgloss.Color(color))
 
-			mainContent.WriteString(fmt.Sprintf("\n%s (%d)\n", statusStyle.Render(status), len(tasks)))
+			fmt.Fprintf(&mainContent, "\n%s (%d)\n", statusStyle.Render(status), len(tasks))
 
 			for _, task := range tasks {
 				taskStyle := lipgloss.NewStyle().
