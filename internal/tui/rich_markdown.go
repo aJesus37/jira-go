@@ -262,7 +262,7 @@ func (r *RichMarkdownRenderer) renderHighlightedCode(code, language string, isFe
 	}
 	// Parse hex color to RGB
 	var rVal, gVal, bVal int
-	fmt.Sscanf(bgColor, "#%02x%02x%02x", &rVal, &gVal, &bVal)
+	_, _ = fmt.Sscanf(bgColor, "#%02x%02x%02x", &rVal, &gVal, &bVal)
 	ansiBG := fmt.Sprintf("\x1b[48;2;%d;%d;%dm", rVal, gVal, bVal)
 	ansiReset := "\x1b[0m"
 
@@ -343,7 +343,7 @@ func (r *RichMarkdownRenderer) renderPlainCodeBlock(code string) {
 	}
 	// Parse hex color to RGB
 	var rVal, gVal, bVal int
-	fmt.Sscanf(bgColor, "#%02x%02x%02x", &rVal, &gVal, &bVal)
+	_, _ = fmt.Sscanf(bgColor, "#%02x%02x%02x", &rVal, &gVal, &bVal)
 	ansiBG := fmt.Sprintf("\x1b[48;2;%d;%d;%dm", rVal, gVal, bVal)
 	// Slightly lighter foreground for code
 	ansiFG := "\x1b[38;2;237;236;238m"
@@ -408,7 +408,7 @@ func (r *RichMarkdownRenderer) renderCodeSpan(n *ast.CodeSpan, source []byte) {
 	}
 	// Parse hex color to RGB
 	var rVal, gVal, bVal int
-	fmt.Sscanf(bgColor, "#%02x%02x%02x", &rVal, &gVal, &bVal)
+	_, _ = fmt.Sscanf(bgColor, "#%02x%02x%02x", &rVal, &gVal, &bVal)
 	ansiBG := fmt.Sprintf("\x1b[48;2;%d;%d;%dm", rVal, gVal, bVal)
 	ansiFG := "\x1b[38;2;248;248;242m" // Soft white
 	ansiReset := "\x1b[0m"
@@ -441,7 +441,7 @@ func (r *RichMarkdownRenderer) renderEmphasis(n *ast.Emphasis, source []byte) {
 // renderList renders a list
 func (r *RichMarkdownRenderer) renderList(n *ast.List, source []byte, depth int) {
 	// Lists are handled by their children (ListItems)
-	r.renderChildren(n, source, depth+1)
+	_ = r.renderChildren(n, source, depth+1)
 }
 
 // renderListItem renders a list item
@@ -490,7 +490,7 @@ func (r *RichMarkdownRenderer) renderListItem(n *ast.ListItem, source []byte, de
 			r.buffer.WriteString("\n")
 			r.renderList(node, source, depth+1)
 		default:
-			r.renderNode(c, source, depth)
+			_ = r.renderNode(c, source, depth)
 		}
 	}
 
@@ -502,7 +502,7 @@ func (r *RichMarkdownRenderer) renderListItem(n *ast.ListItem, source []byte, de
 // renderInlineChildren renders only inline children
 func (r *RichMarkdownRenderer) renderInlineChildren(n ast.Node, source []byte) {
 	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
-		r.renderNode(c, source, 0)
+		_ = r.renderNode(c, source, 0)
 	}
 }
 
@@ -611,7 +611,7 @@ func (r *RichMarkdownRenderer) renderTable(n *extAST.Table, source []byte) {
 func (r *RichMarkdownRenderer) extractText(n ast.Node, source []byte) string {
 	var buf bytes.Buffer
 
-	ast.Walk(n, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+	_ = ast.Walk(n, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}

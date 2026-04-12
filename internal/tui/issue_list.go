@@ -915,8 +915,8 @@ func (m IssueListModel) detailView() string {
 	b.WriteString("\n\n")
 	b.WriteString(selectedStyle.Render(m.selected.Summary))
 	b.WriteString("\n\n")
-	b.WriteString(fmt.Sprintf("Type: %s\n", m.selected.Type))
-	b.WriteString(fmt.Sprintf("Status: %s\n", m.selected.Status))
+	fmt.Fprintf(&b, "Type: %s\n", m.selected.Type)
+	fmt.Fprintf(&b, "Status: %s\n", m.selected.Status)
 
 	// Show multi-owners if available, otherwise show single assignee
 	if len(m.selected.Owners) > 0 {
@@ -924,14 +924,14 @@ func (m IssueListModel) detailView() string {
 	} else if m.selected.Assignee != "" {
 		b.WriteString(assigneeStyle.Render(fmt.Sprintf("👤 Assignee: %s", m.selected.Assignee)))
 		if m.selected.AssigneeEmail != "" {
-			b.WriteString(fmt.Sprintf(" (%s)", m.selected.AssigneeEmail))
+			fmt.Fprintf(&b, " (%s)", m.selected.AssigneeEmail)
 		}
 		b.WriteString("\n")
 	} else {
 		b.WriteString("👤 Assignee: Unassigned\n")
 	}
 
-	b.WriteString(fmt.Sprintf("Created: %s\n", m.selected.Created))
+	fmt.Fprintf(&b, "Created: %s\n", m.selected.Created)
 	b.WriteString("\n" + strings.Repeat("─", 60) + "\n")
 
 	// Show message if any
@@ -971,7 +971,7 @@ func (m IssueListModel) statusChangeView() string {
 	b.WriteString(titleStyle.Render(fmt.Sprintf(" %s ", m.selected.Key)))
 	b.WriteString("\n\n")
 	b.WriteString(selectedStyle.Render("Change Status"))
-	b.WriteString(fmt.Sprintf(" (current: %s)\n\n", m.selected.Status))
+	fmt.Fprintf(&b, " (current: %s)\n\n", m.selected.Status)
 
 	if m.loading {
 		b.WriteString(loadingStyle.Render("Loading available transitions..."))
@@ -982,7 +982,7 @@ func (m IssueListModel) statusChangeView() string {
 			if i == m.transitionIndex {
 				b.WriteString(selectedActionStyle.Render(fmt.Sprintf("▸ %s", t.Name)))
 			} else {
-				b.WriteString(fmt.Sprintf("  %s", t.Name))
+				fmt.Fprintf(&b, "  %s", t.Name)
 			}
 			b.WriteString("\n")
 		}
@@ -1001,7 +1001,7 @@ func (m IssueListModel) assigneeChangeView() string {
 	b.WriteString("\n\n")
 	b.WriteString(selectedStyle.Render("Change Assignee"))
 	if m.selected.Assignee != "" {
-		b.WriteString(fmt.Sprintf(" (current: %s)", m.selected.Assignee))
+		fmt.Fprintf(&b, " (current: %s)", m.selected.Assignee)
 	}
 	b.WriteString("\n\n")
 
@@ -1144,7 +1144,7 @@ func (m IssueListModel) sprintAssignView() string {
 	b.WriteString("\n\n")
 	b.WriteString(selectedStyle.Render("Put in Sprint"))
 	if m.selected.SprintName != "" {
-		b.WriteString(fmt.Sprintf(" (current: %s)", m.selected.SprintName))
+		fmt.Fprintf(&b, " (current: %s)", m.selected.SprintName)
 	}
 	b.WriteString("\n\n")
 
@@ -1157,11 +1157,11 @@ func (m IssueListModel) sprintAssignView() string {
 			if i == m.sprintIndex {
 				b.WriteString(selectedActionStyle.Render(fmt.Sprintf("▸ %s", sprint.Name)))
 			} else {
-				b.WriteString(fmt.Sprintf("  %s", sprint.Name))
+				fmt.Fprintf(&b, "  %s", sprint.Name)
 			}
 			// Add dates if available
 			if !sprint.StartDate.IsZero() && !sprint.EndDate.IsZero() {
-				b.WriteString(fmt.Sprintf(" (%s - %s)", sprint.StartDate.Time().Format("Jan 2"), sprint.EndDate.Time().Format("Jan 2")))
+				fmt.Fprintf(&b, " (%s - %s)", sprint.StartDate.Time().Format("Jan 2"), sprint.EndDate.Time().Format("Jan 2"))
 			}
 			b.WriteString("\n")
 		}
