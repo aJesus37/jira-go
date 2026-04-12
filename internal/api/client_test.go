@@ -46,7 +46,7 @@ func TestDoRequest(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"key": "PROJ-1"}`))
+		_, _ = w.Write([]byte(`{"key": "PROJ-1"}`))
 	}))
 	defer server.Close()
 
@@ -62,7 +62,7 @@ func TestDoRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DoRequest() error = %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("StatusCode = %v, want %v", resp.StatusCode, http.StatusOK)

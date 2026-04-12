@@ -15,7 +15,7 @@ func TestCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer cache.Close()
+	defer cache.Close() //nolint:errcheck
 
 	// Test Set and Get
 	t.Run("Set and Get", func(t *testing.T) {
@@ -37,7 +37,9 @@ func TestCache(t *testing.T) {
 	// Test expiration
 	t.Run("Expiration", func(t *testing.T) {
 		data := []byte(`{"temp": true}`)
-		cache.Set("expire-key", data, 1*time.Millisecond)
+		if err := cache.Set("expire-key", data, 1*time.Millisecond); err != nil {
+			t.Fatalf("Set() error = %v", err)
+		}
 
 		time.Sleep(10 * time.Millisecond)
 

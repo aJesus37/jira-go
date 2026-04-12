@@ -72,7 +72,7 @@ func runCacheStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("opening cache: %w", err)
 	}
-	defer c.Close()
+	defer c.Close() //nolint:errcheck
 
 	total, expired, err := c.Stats()
 	if err != nil {

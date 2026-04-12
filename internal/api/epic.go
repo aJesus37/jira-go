@@ -35,7 +35,7 @@ func (c *Client) GetEpics(projectKey string) ([]Epic, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fetching epics: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("get epics failed: %s", resp.Status)
@@ -82,7 +82,7 @@ func (c *Client) GetEpicIssues(epicKey string, ownerFieldID string, sprintFieldI
 	if err != nil {
 		return nil, fmt.Errorf("fetching epic issues: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("get epic issues failed: %s", resp.Status)
