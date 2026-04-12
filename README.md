@@ -19,7 +19,7 @@ A comprehensive CLI tool for managing Jira Software projects with support for ta
 
 ```bash
 git clone https://github.com/aJesus37/jira-go
-cd jira
+cd jira-go
 task build
 ```
 
@@ -35,7 +35,7 @@ Then install to your system:
 
 ### Download Binary
 
-Download the latest release from the releases page, then run:
+Download the latest release from the [releases page](https://github.com/aJesus37/jira-go/releases), then run:
 
 ```bash
 jira install
@@ -128,6 +128,19 @@ jira cache clear
 jira cache path
 ```
 
+### Update
+
+```bash
+# Check for updates (exits 1 if update available)
+jira update --check
+
+# Update to latest version
+jira update
+
+# Update without confirmation
+jira update --yes
+```
+
 ### Agile Ceremonies
 
 ```bash
@@ -165,6 +178,7 @@ jira sprint board --no-interactive
 | `[` / `]` | Move column left/right (reorder) |
 | `d` or `Enter` | View ticket details |
 | `s` | Change ticket status |
+| `u` | Manage owners (add/remove) |
 | `c` | Add comment |
 | `q` or `Esc` | Quit |
 
@@ -217,8 +231,6 @@ Jira only supports a single assignee per issue. To enable multiple owners:
 All commands support these global flags:
 
 - `-p, --project` - Override default project
-- `--no-cache` - Disable cache for this command
-- `--cache-ttl` - Custom cache TTL (e.g., `5m`, `1h`)
 - `-v, --verbose` - Enable verbose output
 
 ## Development
