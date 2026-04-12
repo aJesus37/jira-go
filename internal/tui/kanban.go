@@ -123,6 +123,7 @@ type KanbanBoardModel struct {
 	activeColumn int
 	client       *api.Client
 	sprintID     int
+	boardID      int
 	width        int
 	height       int
 
@@ -130,6 +131,8 @@ type KanbanBoardModel struct {
 	projectKey          string
 	hiddenCount         int
 	columnWidthOverride int
+	ownerFieldID        string
+	sprintFieldID       string
 
 	// Action mode
 	mode          KanbanMode
@@ -196,7 +199,7 @@ func generateMockTasks() []KanbanIssue {
 }
 
 // NewKanbanBoard creates a new kanban board TUI
-func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, projectKey string) KanbanBoardModel {
+func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, projectKey string, boardID int, ownerFieldID, sprintFieldID string) KanbanBoardModel {
 	// Load column preferences
 	prefs, _ := config.LoadBoardColumns(projectKey)
 
@@ -359,6 +362,7 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 		activeColumn:        0,
 		client:              client,
 		sprintID:            sprintID,
+		boardID:             boardID,
 		mode:                ModeKanbanNormal,
 		commentInput:        commentInput,
 		transitionIndex:     0,
@@ -366,6 +370,8 @@ func NewKanbanBoard(issues []models.Issue, sprintID int, client *api.Client, pro
 		columnPrefs:         prefs,
 		projectKey:          projectKey,
 		columnWidthOverride: 0,
+		ownerFieldID:        ownerFieldID,
+		sprintFieldID:       sprintFieldID,
 	}
 }
 
@@ -455,9 +461,7 @@ func (m KanbanBoardModel) loadSprints() tea.Cmd {
 		if m.client == nil {
 			return kanbanSprintsLoadedMsg{err: fmt.Errorf("no client")}
 		}
-		// Get board ID from sprint - we need to fetch board info
-		// For now, we'll use the current sprint's board
-		sprints, err := m.client.GetOpenSprints(0) // This won't work without board ID
+		sprints, err := m.client.GetOpenSprints(m.boardID)
 		return kanbanSprintsLoadedMsg{sprints: sprints, err: err}
 	}
 }
@@ -467,7 +471,7 @@ func (m KanbanBoardModel) refreshIssue(key string) tea.Cmd {
 		if m.client == nil {
 			return kanbanIssueRefreshedMsg{err: fmt.Errorf("no client")}
 		}
-		issue, err := m.client.GetIssue(key, "", "")
+		issue, err := m.client.GetIssue(key, m.ownerFieldID, m.sprintFieldID)
 		return kanbanIssueRefreshedMsg{issue: issue, err: err}
 	}
 }
@@ -487,8 +491,7 @@ func (m KanbanBoardModel) loadIssueDetails(key string) tea.Cmd {
 		if m.client == nil {
 			return kanbanIssueDetailsLoadedMsg{err: fmt.Errorf("no client")}
 		}
-		// Fetch issue with description
-		issue, err := m.client.GetIssue(key, "description", "")
+		issue, err := m.client.GetIssue(key, m.ownerFieldID, m.sprintFieldID)
 		return kanbanIssueDetailsLoadedMsg{issue: issue, err: err}
 	}
 }
@@ -808,14 +811,6 @@ func (m KanbanBoardModel) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			m.mode = ModeKanbanAddComment
 			m.commentInput.SetValue("")
 			m.commentInput.Focus()
-			m.message = ""
-			return m, nil
-		}
-	case "a":
-		// Change assignee
-		if item, ok := m.columns[m.activeColumn].List.SelectedItem().(KanbanIssueItem); ok {
-			m.selectedIssue = item.issue
-			m.mode = ModeKanbanAssigneeChange
 			m.message = ""
 			return m, nil
 		}

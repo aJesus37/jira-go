@@ -231,6 +231,10 @@ func runSprintCreate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	if !startDate.IsZero() && !endDate.IsZero() && endDate.Before(startDate) {
+		return fmt.Errorf("end date cannot be before start date")
+	}
+
 	client, err := api.NewClient(cfg, projectKey)
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)
@@ -336,6 +340,9 @@ func runSprintIssues(cmd *cobra.Command, args []string) error {
 	}
 
 	format, _ := cmd.Flags().GetString("format")
+	if format == "" {
+		format = "table"
+	}
 	if format != "table" && format != "json" {
 		return fmt.Errorf("unknown format %q: must be table or json", format)
 	}
@@ -471,7 +478,7 @@ func runSprintBoard(cmd *cobra.Command, args []string) error {
 	}
 
 	// Launch kanban TUI
-	model := tui.NewKanbanBoard(issues, sprintID, client, projectKey)
+	model := tui.NewKanbanBoard(issues, sprintID, client, projectKey, project.BoardID, project.MultiOwnerField, project.SprintField)
 	return tui.Run(model)
 }
 

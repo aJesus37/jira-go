@@ -54,6 +54,9 @@ func runReport(cmd *cobra.Command, args []string) error {
 	}
 
 	format, _ := cmd.Flags().GetString("format")
+	if format == "" {
+		format = "table"
+	}
 	if format != "table" && format != "json" {
 		return fmt.Errorf("unknown format %q: must be table or json", format)
 	}

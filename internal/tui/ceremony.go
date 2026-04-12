@@ -3,6 +3,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -416,24 +417,67 @@ func (m CeremonyModel) viewDailyStandup() string {
 
 		// Show tasks grouped by status
 		tasksByStatus := m.assigneeTasks[member.Name]
-		statusOrder := []string{"Done", "In Progress", "To Do", "Blocked", "Review"}
-		statusColors := map[string]string{
-			"Done":        "#00C851",
-			"In Progress": "#00A8E8",
-			"To Do":       "#808080",
-			"Blocked":     "#FF4444",
-			"Review":      "#FFA500",
+
+		// Known status patterns for ordering (case-insensitive)
+		statusPriority := map[string]int{
+			"done":        1,
+			"closed":      1,
+			"review":      2,
+			"in review":   2,
+			"in progress": 3,
+			"progress":    3,
+			"blocked":     4,
+			"to do":       5,
+			"todo":        5,
+			"open":        5,
+			"new":         6,
 		}
 
+		// Default colors for common statuses
+		statusColors := map[string]string{
+			"done":        "#00C851",
+			"closed":      "#00C851",
+			"review":      "#FFA500",
+			"in review":   "#FFA500",
+			"in progress": "#00A8E8",
+			"progress":    "#00A8E8",
+			"blocked":     "#FF4444",
+			"to do":       "#808080",
+			"todo":        "#808080",
+			"open":        "#808080",
+			"new":         "#808080",
+		}
+
+		// Get unique statuses and sort them
+		var statuses []string
+		for status := range tasksByStatus {
+			statuses = append(statuses, status)
+		}
+		sort.SliceStable(statuses, func(i, j int) bool {
+			si, sji := strings.ToLower(statuses[i]), strings.ToLower(statuses[j])
+			pi, oki := statusPriority[si]
+			pj, okj := statusPriority[sji]
+			if oki && okj {
+				if pi != pj {
+					return pi < pj
+				}
+			} else if oki {
+				return true
+			} else if okj {
+				return false
+			}
+			return si < sji
+		})
+
 		hasTasks := false
-		for _, status := range statusOrder {
+		for _, status := range statuses {
 			tasks := tasksByStatus[status]
 			if len(tasks) == 0 {
 				continue
 			}
 			hasTasks = true
 
-			color := statusColors[status]
+			color := statusColors[strings.ToLower(status)]
 			if color == "" {
 				color = "#808080"
 			}

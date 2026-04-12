@@ -74,3 +74,31 @@ func (c *Client) GetCurrentUser() (*models.User, error) {
 
 	return &user, nil
 }
+
+// SearchUsers searches for users by query string (for autocomplete)
+func (c *Client) SearchUsers(query string) ([]models.User, error) {
+	if query == "" {
+		return nil, nil
+	}
+
+	params := url.Values{}
+	params.Set("query", query)
+	params.Set("maxResults", "10")
+
+	resp, err := c.Get("/rest/api/3/user/search?" + params.Encode())
+	if err != nil {
+		return nil, fmt.Errorf("searching users: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("user search failed: %s", resp.Status)
+	}
+
+	var users []models.User
+	if err := json.NewDecoder(resp.Body).Decode(&users); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return users, nil
+}

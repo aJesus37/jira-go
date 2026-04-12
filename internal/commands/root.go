@@ -12,8 +12,6 @@ import (
 var (
 	// Global flags
 	projectFlag       string
-	noCacheFlag       bool
-	cacheTTLFlag      string
 	verboseFlag       bool
 	noInteractiveFlag bool
 )
@@ -32,8 +30,6 @@ Use --no-interactive flag for automation/AI agent compatibility.`,
 		if cmd.Name() == "init" || cmd.Name() == "version" || cmd.Name() == "help" {
 			return nil
 		}
-
-		// TODO: Initialize cache based on flags
 		return nil
 	},
 }
@@ -66,8 +62,6 @@ func Execute() error {
 func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&projectFlag, "project", "", "Project key (overrides config)")
-	rootCmd.PersistentFlags().BoolVar(&noCacheFlag, "no-cache", false, "Disable cache for this command")
-	rootCmd.PersistentFlags().StringVar(&cacheTTLFlag, "cache-ttl", "", "Cache TTL (e.g., 5m, 1h)")
 	rootCmd.PersistentFlags().BoolVarP(&verboseFlag, "verbose", "v", false, "Enable verbose output")
 	rootCmd.PersistentFlags().BoolVar(&noInteractiveFlag, "no-interactive", false, "Disable interactive TUI mode (for automation/CI)")
 }
