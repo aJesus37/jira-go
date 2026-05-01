@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-05-01
+
+### Added
+- Bundle Claude Code skills into the binary via `go:embed`
+- `jira skills install` command to install bundled skills to `~/.agents/skills/jira-go/` and symlink into `~/.claude/skills/`
+- `install.sh` one-liner for Linux/macOS: downloads the release binary, installs it to PATH, and installs skills in one step
+- One-liner install section in README
+
+### Removed
+- `install-skills.sh` (superseded by `jira skills install`)
+
 ## [0.2.1] - 2026-04-12
 
 ### Fixed
