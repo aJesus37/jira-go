@@ -15,6 +15,14 @@ A comprehensive CLI tool for managing Jira Software projects with support for ta
 
 ## Installation
 
+### One-liner (Linux / macOS)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aJesus37/jira-go/main/install.sh | bash
+```
+
+This downloads the latest release binary, installs it to `~/.local/bin`, and installs the Claude Code skills.
+
 ### From Source
 
 ```bash
@@ -29,6 +37,9 @@ Then install to your system:
 # Install to user-local directory (no admin required)
 ./build/jira install
 
+# Install Claude Code skills
+./build/jira skills install
+
 # Or install system-wide (may require sudo/admin)
 ./build/jira install --global
 ```
@@ -39,6 +50,7 @@ Download the latest release from the [releases page](https://github.com/aJesus37
 
 ```bash
 jira install
+jira skills install
 ```
 
 The installer will:
@@ -46,6 +58,8 @@ The installer will:
 - Install to a user-local directory by default (no admin privileges needed)
 - Automatically elevate permissions only if required (for `--global` installs)
 - Add installation path instructions if not in your PATH
+
+`jira skills install` writes the bundled Claude Code skills to `~/.agents/skills/jira-go/` and symlinks them into `~/.claude/skills/`.
 
 ## Quick Start
 
