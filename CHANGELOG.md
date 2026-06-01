@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Send description in ADF format when editing issues (fixes HTTP 400 error)
+
 ## [0.2.2] - 2026-05-01
 
 ### Added
@@ -77,7 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration wizard via `jira init`
 - TUI for interactive task browsing
 
-[Unreleased]: https://github.com/aJesus37/jira-go/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/aJesus37/jira-go/compare/v0.2.2...HEAD
 [0.2.1]: https://github.com/aJesus37/jira-go/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/aJesus37/jira-go/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aJesus37/jira-go/releases/tag/v0.1.0
