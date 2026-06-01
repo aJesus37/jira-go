@@ -452,7 +452,21 @@ func runTaskEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	if description, _ := cmd.Flags().GetString("description"); description != "" {
-		fields["description"] = description
+		fields["description"] = map[string]interface{}{
+			"type":    "doc",
+			"version": 1,
+			"content": []map[string]interface{}{
+				{
+					"type": "paragraph",
+					"content": []map[string]interface{}{
+						{
+							"type": "text",
+							"text": description,
+						},
+					},
+				},
+			},
+		}
 	}
 
 	if len(fields) > 0 {
