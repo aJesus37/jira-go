@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/sys/execabs"
 )
 
 var (
@@ -112,6 +113,22 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Updated to %s\n", latestVersion)
+
+	// Install skills from the new binary
+	binaryName := "jira"
+	if runtime.GOOS == "windows" {
+		binaryName = "jira.exe"
+	}
+	newBinary := filepath.Join(installDir, binaryName)
+	fmt.Print("Installing bundled skills... ")
+	skillsCmd := execabs.Command(newBinary, "skills", "install")
+	skillsCmd.Stdout = os.Stdout
+	skillsCmd.Stderr = os.Stderr
+	if err := skillsCmd.Run(); err != nil {
+		fmt.Printf("⚠ Could not install skills: %v\n", err)
+		fmt.Println("Run 'jira skills install' manually.")
+	}
+
 	if !isInPATH(installDir) {
 		fmt.Printf("Note: %s is not in your PATH\n", installDir)
 	}

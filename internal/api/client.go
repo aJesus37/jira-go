@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -20,19 +21,39 @@ type Client struct {
 	APIToken   string
 }
 
-// NewClient creates a new Jira API client
+// NewClient creates a new Jira API client for a specific project
 func NewClient(cfg *config.Config, projectKey string) (*Client, error) {
 	project, err := cfg.GetProject(projectKey)
 	if err != nil {
 		return nil, err
 	}
 
+	return newClient(project.JiraURL, cfg.Auth.Email, cfg.Auth.APIToken), nil
+}
+
+// NewClientFromConfig creates a Jira API client without requiring a project key.
+// All projects share the same Jira instance; picks the default project or the first configured one.
+func NewClientFromConfig(cfg *config.Config) (*Client, error) {
+	if cfg.DefaultProject != "" {
+		if project, err := cfg.GetProject(cfg.DefaultProject); err == nil && project.JiraURL != "" {
+			return newClient(project.JiraURL, cfg.Auth.Email, cfg.Auth.APIToken), nil
+		}
+	}
+	for _, project := range cfg.Projects {
+		if project.JiraURL != "" {
+			return newClient(project.JiraURL, cfg.Auth.Email, cfg.Auth.APIToken), nil
+		}
+	}
+	return nil, fmt.Errorf("no Jira URL found in config — add at least one project")
+}
+
+func newClient(baseURL, email, apiToken string) *Client {
 	return &Client{
 		HTTPClient: &http.Client{Timeout: 30 * time.Second},
-		BaseURL:    project.JiraURL,
-		Email:      cfg.Auth.Email,
-		APIToken:   cfg.Auth.APIToken,
-	}, nil
+		BaseURL:    baseURL,
+		Email:      email,
+		APIToken:   apiToken,
+	}
 }
 
 // DoRequest performs an HTTP request with authentication

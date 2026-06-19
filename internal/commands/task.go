@@ -83,6 +83,22 @@ var taskCommentCmd = &cobra.Command{
 	RunE:  runTaskComment,
 }
 
+var taskMineCmd = &cobra.Command{
+	Use:   "mine",
+	Short: "Show tickets related to you across all projects",
+	Long: `Show tickets where you are assignee, reporter, or watcher across all configured projects.
+
+Combines assignee = currentUser() OR reporter = currentUser() OR watcher = currentUser()
+into a single cross-project search. Results are deduplicated and annotated with roles.
+
+Examples:
+  jira task mine
+  jira task mine --active
+  jira task mine --role assignee,reporter
+  jira task mine --project SWCSIRT,SEC --format json`,
+	RunE: runTaskMine,
+}
+
 func init() {
 	rootCmd.AddCommand(taskCmd)
 	taskCmd.AddCommand(taskListCmd)
@@ -92,11 +108,14 @@ func init() {
 	taskCmd.AddCommand(taskDeleteCmd)
 	taskCmd.AddCommand(taskStatusCmd)
 	taskCmd.AddCommand(taskCommentCmd)
+	taskCmd.AddCommand(taskMineCmd)
 	taskStatusCmd.Flags().String("comment", "", "Optional comment to add with the status change")
 
 	// List flags
-	taskListCmd.Flags().String("project", "", "Project key (defaults to config)")
+	taskListCmd.Flags().String("project", "", "Project key (comma-separated for cross-project search)")
 	taskListCmd.Flags().String("assignee", "", "Filter by assignee email")
+	taskListCmd.Flags().String("reporter", "", "Filter by reporter email")
+	taskListCmd.Flags().String("watcher", "", "Filter by watcher email")
 	taskListCmd.Flags().String("owner", "", "Filter by owner email (multi-owner field)")
 	taskListCmd.Flags().String("status", "", "Filter by status")
 	taskListCmd.Flags().Bool("active", false, "Show only active tasks (exclude status category 'Done')")
@@ -104,15 +123,30 @@ func init() {
 	taskListCmd.Flags().Int("limit", 50, "Maximum results (default 50 for interactive mode)")
 	taskListCmd.Flags().String("format", "table", "Output format: table or json")
 	taskListCmd.Flags().Bool("age", false, "Show days in current status column")
+	taskListCmd.Flags().Bool("all-projects", false, "Search across all configured projects")
+	taskListCmd.Flags().String("jql", "", "Custom JQL query (overrides project/other filters)")
 
 	// Create flags
 	taskCreateCmd.Flags().String("project", "", "Project key (defaults to config)")
 	taskCreateCmd.Flags().String("type", "Task", "Issue type")
 	taskCreateCmd.Flags().String("summary", "", "Issue summary (required)")
 	taskCreateCmd.Flags().String("description", "", "Issue description")
+	taskCreateCmd.Flags().String("description-format", "plain", "Description format: plain, markdown, or adf-file")
+	taskCreateCmd.Flags().String("description-file", "", "Path to file containing description (ADF JSON or markdown)")
 	taskCreateCmd.Flags().String("assignee", "", "Assignee email")
 	taskCreateCmd.Flags().String("owners", "", "Comma-separated owner emails")
+	taskCreateCmd.Flags().String("parent", "", "Parent issue key (for subtask creation)")
+	taskCreateCmd.Flags().String("epic", "", "Epic key to link the issue to")
+	taskCreateCmd.Flags().Int("sprint", 0, "Sprint ID to assign the issue to")
 	taskCreateCmd.Flags().String("status", "", "Set initial status after creation (e.g. 'Done')")
+
+	// Mine flags
+	taskMineCmd.Flags().String("role", "assignee,reporter", "Roles to include: assignee, reporter, watcher (comma-separated)")
+	taskMineCmd.Flags().Bool("active", false, "Exclude Done/Cancelled tickets")
+	taskMineCmd.Flags().String("project", "", "Comma-separated project keys (default: all configured projects)")
+	taskMineCmd.Flags().String("format", "table", "Output format: table or json")
+	taskMineCmd.Flags().Bool("age", false, "Show days in current status column")
+	taskMineCmd.Flags().Int("limit", 100, "Maximum results per role query")
 
 	// Edit flags
 	taskEditCmd.Flags().String("summary", "", "New summary")
@@ -127,6 +161,26 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
+	format, _ := cmd.Flags().GetString("format")
+	showAge, _ := cmd.Flags().GetBool("age")
+	if format == "" {
+		format = "table"
+	}
+
+	// If --jql is provided, run directly with no project scoping
+	if customJQL, _ := cmd.Flags().GetString("jql"); customJQL != "" {
+		client, err := api.NewClientFromConfig(cfg)
+		if err != nil {
+			return fmt.Errorf("creating client: %w", err)
+		}
+		limit, _ := cmd.Flags().GetInt("limit")
+		resp, err := client.SearchIssues(customJQL, 0, limit, "", "")
+		if err != nil {
+			return fmt.Errorf("searching issues: %w", err)
+		}
+		return displayTaskListTable(resp.Issues, resp.Total, false, format, showAge)
+	}
+
 	projectKey := getProjectKey(cmd, cfg)
 
 	client, err := api.NewClient(cfg, projectKey)
@@ -134,11 +188,28 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating client: %w", err)
 	}
 
+	// Determine if this is a cross-project query
+	allProjects, _ := cmd.Flags().GetBool("all-projects")
+
 	// Build JQL query
-	jql := fmt.Sprintf("project = '%s'", escapeJQL(projectKey))
+	var jql string
+	if allProjects {
+		var keys []string
+		for k := range cfg.Projects {
+			keys = append(keys, fmt.Sprintf("'%s'", escapeJQL(k)))
+		}
+		jql = fmt.Sprintf("project IN (%s)", strings.Join(keys, ", "))
+	} else if strings.Contains(projectKey, ",") {
+		projects := strings.Split(projectKey, ",")
+		for i, p := range projects {
+			projects[i] = fmt.Sprintf("'%s'", escapeJQL(strings.TrimSpace(p)))
+		}
+		jql = fmt.Sprintf("project IN (%s)", strings.Join(projects, ", "))
+	} else {
+		jql = fmt.Sprintf("project = '%s'", escapeJQL(projectKey))
+	}
 
 	if assignee, _ := cmd.Flags().GetString("assignee"); assignee != "" {
-		// Resolve email to account ID for JQL
 		user, err := client.ResolveEmail(assignee)
 		if err != nil {
 			return fmt.Errorf("resolving assignee email: %w", err)
@@ -146,16 +217,30 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 		jql += fmt.Sprintf(" AND assignee = '%s'", escapeJQL(user.AccountID))
 	}
 
+	if reporter, _ := cmd.Flags().GetString("reporter"); reporter != "" {
+		user, err := client.ResolveEmail(reporter)
+		if err != nil {
+			return fmt.Errorf("resolving reporter email: %w", err)
+		}
+		jql += fmt.Sprintf(" AND reporter = '%s'", escapeJQL(user.AccountID))
+	}
+
+	if watcher, _ := cmd.Flags().GetString("watcher"); watcher != "" {
+		user, err := client.ResolveEmail(watcher)
+		if err != nil {
+			return fmt.Errorf("resolving watcher email: %w", err)
+		}
+		jql += fmt.Sprintf(" AND watcher = '%s'", escapeJQL(user.AccountID))
+	}
+
 	if status, _ := cmd.Flags().GetString("status"); status != "" {
 		jql += fmt.Sprintf(" AND status = '%s'", escapeJQL(status))
 	}
 
-	// Filter for active tasks only (exclude done status category)
 	if active, _ := cmd.Flags().GetBool("active"); active {
 		jql += " AND statusCategory != Done"
 	}
 
-	// Filter for backlog tasks only (not in any sprint)
 	if backlog, _ := cmd.Flags().GetBool("backlog"); backlog {
 		jql += " AND sprint is EMPTY"
 	}
@@ -164,7 +249,6 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 	project, _ := cfg.GetProject(projectKey)
 	ownerFieldID := project.MultiOwnerField
 
-	// Handle owner filter - we'll filter locally since JQL for custom fields is unreliable
 	var ownerFilterEmail string
 	if ownerEmail, _ := cmd.Flags().GetString("owner"); ownerEmail != "" {
 		if ownerFieldID == "" {
@@ -175,7 +259,7 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 
 	limit, _ := cmd.Flags().GetInt("limit")
 	if limit <= 0 {
-		limit = 50 // Default limit
+		limit = 50
 	}
 
 	resp, err := client.SearchIssues(jql, 0, limit, ownerFieldID, project.SprintField)
@@ -183,7 +267,6 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("searching issues: %w", err)
 	}
 
-	// Filter by owner locally if specified
 	if ownerFilterEmail != "" {
 		var filteredIssues []models.Issue
 		for _, issue := range resp.Issues {
@@ -197,18 +280,14 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 		resp.Issues = filteredIssues
 	}
 
-	// Check if we should run in non-interactive mode
-	format, _ := cmd.Flags().GetString("format")
-	showAge, _ := cmd.Flags().GetBool("age")
-	if format == "" {
-		format = "table"
-	}
-	if noInteractiveFlag || format != "table" || showAge {
+	// Determine if cross-project (skip interactive TUI)
+	isCrossProject := allProjects || strings.Contains(projectKey, ",")
+
+	if noInteractiveFlag || format != "table" || showAge || isCrossProject {
 		mergeAssigneeOwner := project.MergeAssigneeOwner == nil || *project.MergeAssigneeOwner
 		return displayTaskListTable(resp.Issues, resp.Total, mergeAssigneeOwner, format, showAge)
 	}
 
-	// Run in interactive TUI mode
 	model := tui.NewIssueList(resp.Issues, client, projectKey, ownerFieldID, project.SprintField, project.BoardID)
 	return tui.Run(model)
 }
@@ -289,14 +368,78 @@ func runTaskCreate(cmd *cobra.Command, args []string) error {
 
 	description, _ := cmd.Flags().GetString("description")
 	issueType, _ := cmd.Flags().GetString("type")
+	parentKey, _ := cmd.Flags().GetString("parent")
+	descFormat, _ := cmd.Flags().GetString("description-format")
+	descFile, _ := cmd.Flags().GetString("description-file")
+	sprintID, _ := cmd.Flags().GetInt("sprint")
 
 	client, err := api.NewClient(cfg, projectKey)
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)
 	}
 
+	// Build options
+	opts := &api.CreateIssueOptions{}
+	if parentKey != "" {
+		opts.ParentKey = parentKey
+	}
+
+	// Handle epic link
+	if epicKey, _ := cmd.Flags().GetString("epic"); epicKey != "" {
+		project, _ := cfg.GetProject(projectKey)
+		opts.EpicKey = epicKey
+		opts.EpicLinkField = project.EpicLinkField
+	}
+
+	// Handle sprint
+	if sprintID > 0 {
+		project, _ := cfg.GetProject(projectKey)
+		if project.SprintField == "" {
+			return fmt.Errorf("sprint_field not configured for project %s, cannot assign to sprint", projectKey)
+		}
+		opts.SprintID = sprintID
+		opts.SprintFieldID = project.SprintField
+	}
+
+	// Handle description format
+	switch descFormat {
+	case "markdown":
+		if descFile != "" {
+			data, err := os.ReadFile(descFile)
+			if err != nil {
+				return fmt.Errorf("reading description file: %w", err)
+			}
+			description = string(data)
+		}
+		if description != "" {
+			opts.DescriptionADF = api.MarkdownToADF(description)
+		}
+	case "adf-file":
+		if descFile == "" {
+			return fmt.Errorf("--description-file is required with --description-format=adf-file")
+		}
+		data, err := os.ReadFile(descFile)
+		if err != nil {
+			return fmt.Errorf("reading ADF description file: %w", err)
+		}
+		var adf map[string]interface{}
+		if err := json.Unmarshal(data, &adf); err != nil {
+			return fmt.Errorf("parsing ADF JSON: %w", err)
+		}
+		opts.DescriptionADF = adf
+		description = "" // Clear to avoid double-setting
+	case "plain":
+		if descFile != "" {
+			data, err := os.ReadFile(descFile)
+			if err != nil {
+				return fmt.Errorf("reading description file: %w", err)
+			}
+			description = string(data)
+		}
+	}
+
 	// Create issue
-	issue, err := client.CreateIssue(projectKey, summary, description, issueType)
+	issue, err := client.CreateIssue(projectKey, summary, description, issueType, opts)
 	if err != nil {
 		return fmt.Errorf("creating issue: %w", err)
 	}
@@ -607,4 +750,82 @@ func runTaskComment(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("✓ Comment added to %s\n", key)
 	return nil
+}
+
+func runTaskMine(cmd *cobra.Command, args []string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	client, err := api.NewClientFromConfig(cfg)
+	if err != nil {
+		return fmt.Errorf("creating client: %w", err)
+	}
+
+	// Get current user
+	currentUser, err := client.GetCurrentUser()
+	if err != nil {
+		return fmt.Errorf("getting current user: %w", err)
+	}
+
+	// Parse role filter
+	roleStr, _ := cmd.Flags().GetString("role")
+	roles := strings.Split(roleStr, ",")
+
+	// Build JQL clauses
+	var clauses []string
+	for _, role := range roles {
+		role = strings.TrimSpace(role)
+		switch role {
+		case "assignee", "reporter", "watcher":
+			clauses = append(clauses, fmt.Sprintf("%s = '%s'", role, escapeJQL(currentUser.AccountID)))
+		}
+	}
+
+	if len(clauses) == 0 {
+		return fmt.Errorf("no valid roles specified; use assignee, reporter, or watcher")
+	}
+
+	jql := "(" + strings.Join(clauses, " OR ") + ")"
+
+	// Optional project scoping
+	if projectFilter, _ := cmd.Flags().GetString("project"); projectFilter != "" {
+		projects := strings.Split(projectFilter, ",")
+		var quoted []string
+		for _, p := range projects {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				quoted = append(quoted, fmt.Sprintf("'%s'", escapeJQL(p)))
+			}
+		}
+		if len(quoted) > 0 {
+			jql += fmt.Sprintf(" AND project IN (%s)", strings.Join(quoted, ","))
+		}
+	}
+
+	// Active filter
+	if active, _ := cmd.Flags().GetBool("active"); active {
+		jql += " AND statusCategory != Done"
+	}
+
+	jql += " ORDER BY updated DESC"
+
+	limit, _ := cmd.Flags().GetInt("limit")
+	if limit <= 0 {
+		limit = 100
+	}
+
+	format, _ := cmd.Flags().GetString("format")
+	showAge, _ := cmd.Flags().GetBool("age")
+	if format == "" {
+		format = "table"
+	}
+
+	resp, err := client.SearchIssues(jql, 0, limit, "", "")
+	if err != nil {
+		return fmt.Errorf("searching issues: %w", err)
+	}
+
+	return displayTaskListTable(resp.Issues, resp.Total, false, format, showAge)
 }

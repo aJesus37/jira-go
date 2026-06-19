@@ -248,15 +248,15 @@ func runEpicAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	projectKey := getProjectKey(cmd, cfg)
+	project, _ := cfg.GetProject(projectKey)
 
 	client, err := api.NewClient(cfg, projectKey)
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)
 	}
 
-	// Link each issue to epic
 	for _, issueKey := range issueKeys {
-		if err := client.LinkIssueToEpic(issueKey, epicKey); err != nil {
+		if err := client.LinkIssueToEpic(issueKey, epicKey, project.EpicLinkField); err != nil {
 			fmt.Printf("⚠ Failed to add %s: %v\n", issueKey, err)
 		} else {
 			fmt.Printf("✓ Added %s to %s\n", issueKey, epicKey)
@@ -275,15 +275,15 @@ func runEpicRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	projectKey := getProjectKey(cmd, cfg)
+	project, _ := cfg.GetProject(projectKey)
 
 	client, err := api.NewClient(cfg, projectKey)
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)
 	}
 
-	// Unlink each issue from epic
 	for _, issueKey := range issueKeys {
-		if err := client.UnlinkIssueFromEpic(issueKey); err != nil {
+		if err := client.UnlinkIssueFromEpic(issueKey, project.EpicLinkField); err != nil {
 			fmt.Printf("⚠ Failed to remove %s: %v\n", issueKey, err)
 		} else {
 			fmt.Printf("✓ Removed %s from epic\n", issueKey)

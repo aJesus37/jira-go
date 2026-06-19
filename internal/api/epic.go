@@ -190,17 +190,22 @@ func (c *Client) UpdateEpic(key string, fields map[string]interface{}) error {
 }
 
 // LinkIssueToEpic links an issue to an epic
-func (c *Client) LinkIssueToEpic(issueKey, epicKey string) error {
-	// Use the Epic Link field (customfield_10014 is common but varies)
-	// For standard Jira, we use the parent field for next-gen projects
-	// or Epic Link for classic projects
+// epicLinkField is the custom field ID for company-managed projects (e.g., "customfield_10014").
+// If empty, uses the parent field (team-managed/next-gen projects).
+func (c *Client) LinkIssueToEpic(issueKey, epicKey, epicLinkField string) error {
+	fields := map[string]interface{}{}
+	if epicLinkField != "" {
+		// Company-managed: use Epic Link custom field
+		fields[epicLinkField] = epicKey
+	} else {
+		// Team-managed: use parent field
+		fields["parent"] = map[string]string{
+			"key": epicKey,
+		}
+	}
 
 	payload := map[string]interface{}{
-		"fields": map[string]interface{}{
-			"parent": map[string]string{
-				"key": epicKey,
-			},
-		},
+		"fields": fields,
 	}
 
 	resp, err := c.Put(fmt.Sprintf("/rest/api/3/issue/%s", issueKey), payload)
@@ -217,11 +222,18 @@ func (c *Client) LinkIssueToEpic(issueKey, epicKey string) error {
 }
 
 // UnlinkIssueFromEpic removes the epic link from an issue
-func (c *Client) UnlinkIssueFromEpic(issueKey string) error {
+// epicLinkField is the custom field ID for company-managed projects.
+// If empty, uses the parent field (team-managed/next-gen projects).
+func (c *Client) UnlinkIssueFromEpic(issueKey, epicLinkField string) error {
+	fields := map[string]interface{}{}
+	if epicLinkField != "" {
+		fields[epicLinkField] = nil
+	} else {
+		fields["parent"] = nil
+	}
+
 	payload := map[string]interface{}{
-		"fields": map[string]interface{}{
-			"parent": nil,
-		},
+		"fields": fields,
 	}
 
 	resp, err := c.Put(fmt.Sprintf("/rest/api/3/issue/%s", issueKey), payload)
