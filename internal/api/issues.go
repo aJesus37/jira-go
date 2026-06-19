@@ -35,8 +35,18 @@ type CreateIssueResponse struct {
 	Self string `json:"self"`
 }
 
+// CreateIssueOptions holds optional parameters for issue creation
+type CreateIssueOptions struct {
+	ParentKey      string
+	EpicKey        string
+	EpicLinkField  string                 // Custom field ID for epic link (company-managed projects)
+	SprintID       int
+	SprintFieldID  string                 // Custom field ID for sprint (e.g., "customfield_10007")
+	DescriptionADF map[string]interface{} // Pre-built ADF description (overrides description param)
+}
+
 // CreateIssue creates a new issue
-func (c *Client) CreateIssue(projectKey, summary, description, issueType string) (*models.Issue, error) {
+func (c *Client) CreateIssue(projectKey, summary, description, issueType string, opts ...*CreateIssueOptions) (*models.Issue, error) {
 	fields := map[string]interface{}{
 		"project": map[string]string{
 			"key": projectKey,
@@ -47,8 +57,15 @@ func (c *Client) CreateIssue(projectKey, summary, description, issueType string)
 		},
 	}
 
-	// Only add description if provided (Jira requires ADF format, not plain string)
-	if description != "" {
+	var options *CreateIssueOptions
+	if len(opts) > 0 {
+		options = opts[0]
+	}
+
+	// Handle description
+	if options != nil && options.DescriptionADF != nil {
+		fields["description"] = options.DescriptionADF
+	} else if description != "" {
 		fields["description"] = map[string]interface{}{
 			"type":    "doc",
 			"version": 1,
@@ -64,6 +81,33 @@ func (c *Client) CreateIssue(projectKey, summary, description, issueType string)
 				},
 			},
 		}
+	}
+
+	// Handle parent (for subtasks)
+	if options != nil && options.ParentKey != "" {
+		fields["parent"] = map[string]string{
+			"key": options.ParentKey,
+		}
+	}
+
+	// Handle epic link
+	if options != nil && options.EpicKey != "" {
+		if options.EpicLinkField != "" {
+			// Company-managed: use Epic Link custom field
+			fields[options.EpicLinkField] = options.EpicKey
+		} else {
+			// Team-managed: use parent field (only if not already set for subtask)
+			if options.ParentKey == "" {
+				fields["parent"] = map[string]string{
+					"key": options.EpicKey,
+				}
+			}
+		}
+	}
+
+	// Handle sprint assignment
+	if options != nil && options.SprintID > 0 && options.SprintFieldID != "" {
+		fields[options.SprintFieldID] = options.SprintID
 	}
 
 	payload := map[string]interface{}{

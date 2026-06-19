@@ -34,6 +34,7 @@ type Project struct {
 	BoardID            int               `yaml:"board_id"`
 	MultiOwnerField    string            `yaml:"multi_owner_field"`
 	SprintField        string            `yaml:"sprint_field"`
+	EpicLinkField      string            `yaml:"epic_link_field"`
 	IssueTypes         map[string]string `yaml:"issue_types"`
 	MergeAssigneeOwner *bool             `yaml:"merge_assignee_owner"`
 }
